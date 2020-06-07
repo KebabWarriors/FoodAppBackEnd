@@ -1,8 +1,8 @@
-const {ApolloServer} = require('apollo-server-lambda');
+const { ApolloServer } = require('apollo-server-lambda');
 
 const server = new ApolloServer({
   modules:[
-    require('./modules/Users')
+    require('./_all.js'),
   ]
 });
 
