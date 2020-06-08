@@ -28,15 +28,6 @@ const typeDefs = `
 	}
 `;
 
-const makeRandomAlias = (length) => {
-  let result = '';
-  const characters  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-  for ( let i = 0; i < length; i++) {
-    result += characters.charAt(Math.floor(Math.random() * characters.length));
-  }
-  return result;
-};
-
 const resolvers = {
 	Query:{
 		restaurantsType: async () => {
@@ -52,7 +43,87 @@ const resolvers = {
 				});
 			});
 			return response;
-		}
+		},
+    restaurant: async (parent, args) => {
+      const session = driver.session();
+      let response = [];
+      let iteratorTool = null;
+      const getData = await session.run(
+        `match (r:restaurant)-[s:is_type]->(b),
+          (p:person)-[:owns]->(r) where r.id = $id
+          return r,s,b,p`,
+          {
+            id: args.id
+          }
+      ).then((result) => {
+        result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+            response.filter((value2,item2) => {
+              if(value2.id === value._fields[0].properties.id){
+                //we storage it on an object
+                iteratorTool = {idParent: item, idChild: item2};
+              }
+            });
+          
+            response.push(
+                {
+                  ... value._fields[0].properties,
+                  owner:  value._fields[3].properties,
+                  type:  [{...value._fields[2].properties}]
+                }
+              );
+            //Then we add it to the correct object in the array and delete the duplicate
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].type.push({...result.records[iteratorTool.idParent]._fields[2].properties});
+              response.splice(iteratorTool.idChild-1,1);
+              iteratorTool = null;
+            }
+        });
+      });
+      return response[0];
+    }, 
+    restaurants: async () => {
+      const session = driver.session();
+      let response = [];
+      //will help you to know if an id is inside of the object 
+      //and it is, it will give us the 
+      let iteratorTool = null;
+      const getData = await session.run(
+          `
+            match (r:restaurant)-[s:is_type]->(b),
+            (p:person)-[:owns]->(r) 
+            return r,s,b,p
+          `,
+          {}
+        ).then((result) => {
+          result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+            response.filter((value2,item2) => {
+              if(value2.id === value._fields[0].properties.id){
+                //we storage it on an object
+                iteratorTool = {idParent: item, idChild: item2};
+              }
+            });
+          
+            response.push(
+                {
+                  ... value._fields[0].properties,
+                  owner:  value._fields[3].properties,
+                  type:  [{...value._fields[2].properties}]
+                }
+              );
+            //Then we add it to the correct object in the array and delete the duplicate
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].type.push({...result.records[iteratorTool.idParent]._fields[2].properties});
+              response.splice(iteratorTool.idChild-1,1);
+              iteratorTool = null;
+            }
+            
+          });
+          
+        });
+        return response;
+    }
 	},
   Restaurant:{
     addRestaurantType: async (parent, args) => {
@@ -87,10 +158,11 @@ const resolvers = {
       const getData = await session.run(
         ` match (p:person) where p.id = $owner 
           with p as pe 
+          create (r:restaurant {id: randomUUID(), name: $name, photo: $photo,address: $address}) 
+          with pe,r
           match (rt:restaurantsType) where ${alias} 
-          with collect(rt) as myList,pe 
+          with collect(rt) as myList,pe,r
           unwind  myList as x 
-          merge (r:restaurant {id: randomUUID(), name: $name, photo: $photo,address: $address}) 
           merge (pe)-[:owns]->(r) 
           merge (r)-[:is_type]->(x) 
           merge (x)-[:is_in]->(r) 
