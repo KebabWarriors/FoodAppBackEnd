@@ -34,12 +34,12 @@ const resolvers = {
       const session = driver.session();
       let response = {}
       const result =  await session.run(
-        'MATCH (p:person) where ID(p) = $id return p',
-        {id: parseInt(args.id)}
+        'MATCH (p:person) where p.id = $id return p',
+        {id: args.id}
       ).then(async(result) =>{
         await session.close();
         if(result.records.length > 0)
-          response = {id: result.records[0]._fields[0].identity.low,...result.records[0]._fields[0].properties}
+          response = {...result.records[0]._fields[0].properties}
       });
       return response;
     },
@@ -52,7 +52,7 @@ const resolvers = {
         ).then(async (result) => {
           await session.close();
           result.records.forEach((value, key) => {
-            response.push({id: value._fields[0].identity.low,...value._fields[0].properties});
+            response.push({...value._fields[0].properties});
           });
           //console.log(result)
         }).catch((error) => {
@@ -70,19 +70,12 @@ const resolvers = {
       
       const session = driver.session();
         const result = await session.run(
-          'CREATE (a:person {name: $name,email: $email,password:$password,phone:$phone}) return ID(a) as id',
+          'CREATE (a:person {id: randomUUID(),name: $name,email: $email,password:$password,phone:$phone}) return a',
           {name: args.name, email: args.email,password: args.password,phone: args.phone}
         ).then(async (result) => {
           await session.close();
-          
-          person = {
-            id: result.records[0].get('id').low,
-            name: args.name, 
-            email: args.email,
-            password: args.password,
-            phone: args.phone
-          };
-          return person;
+          //console.log(result.records[0]._fields[0].properties);
+          person = result.records[0]._fields[0].properties;
         }).catch((error) =>{
           return  {id: 0,name: "error", email: "error",password: "error",phone: "error"}
         });
@@ -91,7 +84,7 @@ const resolvers = {
     updatePerson: async (parent, args) => {
       const session = driver.session();
       let query = "";
-      let params = {id: parseInt(args.id)};
+      let params = {id: args.id};
       let response = {};
 
       if(args.name != undefined){
@@ -115,12 +108,12 @@ const resolvers = {
       }
 
       const result = await session.run(
-        `MATCH (p:person) where ID(p) = $id set ${query} return p`,
+        `MATCH (p:person) where p.id = $id set ${query} return p`,
         params
       ).then( async (result) => {
         await session.close();
         if(result.records.length > 0)
-          response = {id: result.records[0]._fields[0].identity.low,...result.records[0]._fields[0].properties}
+          response = {...result.records[0]._fields[0].properties}
       }).catch((error) => {
         console.log(`error: ${error}`);
       });
