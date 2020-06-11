@@ -14,6 +14,7 @@ const typeDefs = `
 		type: [RestaurantType],
     owner: Person,
     address: String
+    description: String
 	}
 
 	extend type Query{
@@ -24,7 +25,7 @@ const typeDefs = `
 
 	extend type Mutation{
 		addRestaurantType(name: String): RestaurantType,
-    addRestaurant(name: String, photo: String, type: [ID], owner: ID, address: String): Restaurant
+    addRestaurant(name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
 	}
 `;
 
@@ -158,7 +159,7 @@ const resolvers = {
       const getData = await session.run(
         ` match (p:person) where p.id = $owner 
           with p as pe 
-          create (r:restaurant {id: randomUUID(), name: $name, photo: $photo,address: $address}) 
+          create (r:restaurant {id: randomUUID(), name: $name, photo: $photo,address: $address,description:$description}) 
           with pe,r
           match (rt:restaurantsType) where ${alias} 
           with collect(rt) as myList,pe,r
@@ -171,7 +172,8 @@ const resolvers = {
           name: args.name, 
           photo: args.photo,
           address:args.address,
-          owner:args.owner
+          owner:args.owner,
+          description: args.description
         }
       ).then( async (result) => {
         await session.close();
