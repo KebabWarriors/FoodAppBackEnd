@@ -31,7 +31,8 @@ const typeDefs = `
 
 const resolvers = {
 	Query:{
-		restaurantsType: async () => {
+		restaurantsType: async (parent, args) => {
+      console.log(`restaurantsType: ${args}`);
 			const session = driver.session();
 			let response = [];
 			const getData = await session.run(
@@ -47,6 +48,7 @@ const resolvers = {
 		},
     restaurant: async (parent, args) => {
       const session = driver.session();
+      console.log(`restaurant: ${args}`);
       let response = [];
       let iteratorTool = null;
       const getData = await session.run(
@@ -83,7 +85,8 @@ const resolvers = {
       });
       return response[0];
     }, 
-    restaurants: async () => {
+    restaurants: async (parent, args) => {
+      console.log(`restaurants: ${args}`);
       const session = driver.session();
       let response = [];
       //will help you to know if an id is inside of the object 
@@ -128,6 +131,7 @@ const resolvers = {
 	},
   Restaurant:{
     addRestaurantType: async (parent, args) => {
+      console.log(`addRestaurant: ${args}`);
       const session = driver.session();
       let response = {};
       const getData = await session.run(
@@ -141,6 +145,7 @@ const resolvers = {
       return response;
     },
     addRestaurant: async (parent, args) =>{
+      console.log(`addRestaurant: ${args}`);
       const session = driver.session();
       let response = {};
       let params = {};

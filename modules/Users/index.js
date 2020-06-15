@@ -31,6 +31,7 @@ const typeDefs = `
 const resolvers = {
   Query:{
     person: async (parent,args,context,info) => {
+      console.log(`person: ${args}`);
       const session = driver.session();
       let response = {}
       const result =  await session.run(
@@ -43,7 +44,8 @@ const resolvers = {
       });
       return response;
     },
-    people: async () => {
+    people: async (parent,args) => {
+      console.log(`people: ${args}`);
       const session = driver.session();
       let response = [];
       const result = await  session.run(
@@ -65,6 +67,7 @@ const resolvers = {
   },
   User:{
     addPerson: async (parent, args) => {
+      console.log(`addPerson: ${args}`);
       let person = {};
       
       
@@ -82,6 +85,7 @@ const resolvers = {
         return person;
     },
     updatePerson: async (parent, args) => {
+      console.log(`updatePerson: ${args}`);
       const session = driver.session();
       let query = "";
       let params = {id: args.id};

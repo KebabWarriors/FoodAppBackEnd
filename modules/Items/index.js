@@ -22,29 +22,59 @@ const typeDefs = `
   }
 
   type Restriction{
-    id: ID
+    id: ID,
+    name: String
     type: RestrictionType
   }
 
   type RestrictionValue{
     id: ID
     value: String
-    restiction: Restriction
+    restriction: Restriction
   }
 
-  input StorageRestrictions{
-    iden: ID
+  type ItemByType{
+    id: ID
+    name: String
+    items: [Item]
+  }
+
+  type RestrictionValueByItemData{
+    id: ID
     value: String
-    values: [String]
+  }
+
+  type RestrictionValueByItem{
+    id: ID
+    name: String
+    type: RestrictionType
+    values: [RestrictionValueByItemData]
+  }
+
+  type RestrictionByItem{
+    id: ID
+    name: String
+    description: String
+    price: Float
+    restriction: [RestrictionValueByItem]
+  }
+
+
+  input StorageRestrictions{
+    idRestrictionType: ID
+    nameResctriction: String
+    valuesResctriction: [String]
   }
 
   extend type Query{
     item(id:ID): Item
-    itemsByRestaurant(resturant: ID): [Item]
+    itemsByRestaurant(id: ID): [Item]
+    itemsByRestaurantByType(id: ID): [ItemByType]
+    restrictionsByItem(id: ID): [RestrictionByItem]
   }
 
   extend type Mutation{
-    addItem(name: String, description: String, type: ID,price: Float,restaurant: ID,restricion: [StorageRestrictions]): Item
+    addItem(name: String, description: String, type: ID,price: Float,restaurant: ID,restriction: [StorageRestrictions]): Item
     addItemType(name: String): ItemType
     addRestrictionType(name: String): RestrictionType
     addRestiction(type: ID): Restriction
@@ -54,7 +84,145 @@ const typeDefs = `
 
 const resolvers = {
   Query: {
+    itemsByRestaurant: async (parent,args) => {
+      console.log(`itemsByRestaurant: ${args}`);
+      const session = driver.session();
+      let response = [];
+      let iteratorTool = null;
+      const getData = await session.run(
+        ` match (r:restaurant)-[]->(i:item) where r.id = $id
+          with r,i
+          match (i)-[]->(it:itemType)
+          return r,i,it
+          `
+        ,{
+          id: args.id
+        }).then(async (result) =>{
+          await session.close();
+          result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+            response.push(
+              {
+                ... value._fields[1].properties,
+                resturant:  value._fields[0].properties,
+                type:  value._fields[2].properties
+              }
+            );
+          });
+        });
+        return response;
+    },
+    itemsByRestaurantByType: async (parent, args) => {
+      console.log(`itemsByRestaurantByType: ${args}`);
+      const session = driver.session();
+      let response = [];
+      let iteratorTool = null;
+      const getData = await session.run(
+        ` match (r:restaurant)-[]->(i:item) where r.id = $id
+          with r,i
+          match (i)-[]->(it:itemType)
+          return r,i,it
+          `
+        ,{
+          id: args.id
+        }).then(async (result) =>{
+          await session.close();
+          result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+            response.filter((value2,item2) => {
+              if(value2.id === value._fields[2].properties.id){
+                //we storage it on an object
+                iteratorTool = {idParent: item, idChild: item2};
+              }
+            });
+          
+            response.push(
+                {
+                  ... value._fields[2].properties,
+                  items:  [
+                    {
+                      ...value._fields[1].properties,
+                      type:value._fields[2].properties,
+                      restaurant: value._fields[0].properties
+                    }
+                  ],
+                  
+                }
+              );
+            //Then we add it to the correct object in the array and delete the duplicate
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].items.push(
+                {
+                  ...value._fields[1].properties,
+                      type:value._fields[2].properties,
+                      restaurant: value._fields[0].properties
+                });
 
+              }
+              response.splice(iteratorTool.idChild-1,1);
+              iteratorTool = null;
+            
+          });
+        });
+        return response;
+    },
+    restrictionsByItem: async (parent, args) => {
+      console.log(`ResctrictionByItem: ${args}`);
+      const session = driver.session();
+      let response = [];
+      let iteratorTool = null
+      const getData = await session.run(
+        ` 
+          match (i:item)-[]->(r:restriction) where i.id = $id
+          with i,r
+          match (r)-[]->(rt:restrictionType)
+          with i,r,rt
+          match (r)<-[]-(rv:restrictionValue)
+          return i,r,rt,rv
+        `,
+        {
+          id: args.id
+        }
+      ).then( async (result)=>{
+        await session.close();
+        result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+            response.filter((value2,item2) => {
+              if(value2.id === value._fields[0].properties.id){
+                //we storage it on an object
+                iteratorTool = {
+                  idParent: item, 
+                  idChild: item2
+                };
+              }
+            });
+            console.log(value._fields[1].properties);
+            response.push(
+                {
+                  ... value._fields[0].properties,
+                  restriction:[{
+                      ...value._fields[1].properties,
+                      type:value._fields[2].properties,
+                      values: [{...value._fields[3].properties}]
+                    }]
+                }
+              );
+            //Then we add it to the correct object in the array and delete the duplicate
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].restriction.push(
+                {
+                  ...value._fields[1].properties,
+                      type:value._fields[2].properties,
+                      values: [{...value._fields[3].properties}]
+                });
+              
+              response.splice(iteratorTool.idChild-1,1);
+              iteratorTool = null;
+            }
+          });
+      });
+      return response; 
+    }
   },
   Items:{
     addRestrictionType: async (parent, args) => {
@@ -72,7 +240,7 @@ const resolvers = {
       const session = driver.session();
       let response = {};
       const getData = await session.run(
-          'CREATE (i:itemType {id:randomUUID,name:$name}return i)',
+          'CREATE (i:itemType {id:randomUUID(),name:$name})return i',
           {name: args.name}
         ).then(async (result) =>{
           response = {...result.records[0]._fields[0].properties};
@@ -82,7 +250,6 @@ const resolvers = {
     addItem: async (parent, args) => {
       const session = driver.session();
       let response = {};
-      let template = ``;
 
       const setData = await session.run(
         `
@@ -96,15 +263,15 @@ const resolvers = {
           merge (r)-[:HAS]->(i)
           with i,t,r
           unwind $option as rs
-          merge (i)-[:IS_TYPE]->(b:restriction{id: randomUUID(),name:rs.value})
+          merge (i)-[:IS_TYPE]->(b:restriction{id: randomUUID(),name:rs.nameResctriction})
           with i,t,r,rs,b 
-          match (d:restrictionType) where d.id = rs.iden
+          match (d:restrictionType) where d.id = rs.idRestrictionType
           with i,t,r,rs,d,b
           merge (b)-[:IS_TYPE]->(d)
           with i,t,r,rs,d,b
-          unwind rs.values as campos
+          unwind rs.valuesResctriction as campos
           merge (c:restrictionValue{id:randomUUID(),value:campos})-[:belongs]->(b)
-          return i,t,r,rs,b,d,c
+          return i,t,r,b,d
         `,
           {
             name: args.name,
@@ -112,13 +279,28 @@ const resolvers = {
             price: args.price,
             itemType: args.type,
             restaurant: args.restaurant,
-            option: args.option
+            option: args.restriction
           }
-        ).then((response)=>{
+        ).then(async (result)=>{
           //Item, ItemType, Restaurant, Options, Restriction, 
           //RestrictionType, ResctrictionValue
-          console.log(response);
+          /*response.records.forEach((value,item)=>{
+            console.log(`respuesta ${item+1}`);
+            console.log(value._fields);  
+          });*/
+        await session.close();
+        response ={
+            ... result.records[0]._fields[0].properties,
+            resturant:  result.records[0]._fields[2].properties,
+            type:  result.records[0]._fields[1].properties,
+            restrictions: []
+          };
+        result.records.forEach((value,item)=>{
+          response.restrictions.push({...value._fields[3].properties, type:value._fields[4].properties});
+          
         });
+
+      });
         return response;
       }
     }
