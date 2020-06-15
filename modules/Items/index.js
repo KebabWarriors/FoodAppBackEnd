@@ -113,7 +113,7 @@ const resolvers = {
         return response;
     },
     itemsByRestaurantByType: async (parent, args) => {
-      console.log(`itemsByRestaurantByType: ${args}`);
+      console.log(`itemsByRestaurantByType: ${args.id}`);
       const session = driver.session();
       let response = [];
       let iteratorTool = null;
@@ -129,9 +129,15 @@ const resolvers = {
           await session.close();
           result.records.forEach((value,item)=>{
             //we verify if we have the restaurant in our object
+            console.log(value._fields[1].properties);
+            console.log(value._fields[2].properties);
             response.filter((value2,item2) => {
               if(value2.id === value._fields[2].properties.id){
                 //we storage it on an object
+                console.log({idParent: item, idChild: item2})
+                //Id parent means the new element that will be added
+                //the child element means the element that is already
+                //in the object/
                 iteratorTool = {idParent: item, idChild: item2};
               }
             });
@@ -146,21 +152,20 @@ const resolvers = {
                       restaurant: value._fields[0].properties
                     }
                   ],
-                  
                 }
               );
             //Then we add it to the correct object in the array and delete the duplicate
             if(iteratorTool !== null){
+              console.log(`Agregara en ${iteratorTool.idChild}`)
               response[iteratorTool.idChild].items.push(
                 {
-                  ...value._fields[1].properties,
+                    ...value._fields[1].properties,
                       type:value._fields[2].properties,
                       restaurant: value._fields[0].properties
                 });
-
-              }
-              response.splice(iteratorTool.idChild-1,1);
+              response.splice(iteratorTool.idChild+1,1);
               iteratorTool = null;
+            }
             
           });
         });
