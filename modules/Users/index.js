@@ -15,6 +15,8 @@ const typeDefs = `
     streetAddress: String
     build: String
     door: String
+    latitude: Float
+    longitude: Float
   }
 
   extend type Query{
@@ -25,6 +27,7 @@ const typeDefs = `
   extend type Mutation{
     addPerson(name: String, email: String, password: String,phone:String): Person
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
+    
   }
 `;
 

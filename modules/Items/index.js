@@ -18,7 +18,7 @@ const typeDefs = `
 
   type RestrictionType{
     id: ID
-    name: String
+    name: Int
   }
 
   type Restriction{
@@ -70,7 +70,7 @@ const typeDefs = `
     item(id:ID): Item
     itemsByRestaurant(id: ID): [Item]
     itemsByRestaurantByType(id: ID): [ItemByType]
-    restrictionsByItem(id: ID): [RestrictionByItem]
+    restrictionsByItem(id: ID): RestrictionByItem
   }
 
   extend type Mutation{
@@ -129,8 +129,6 @@ const resolvers = {
           await session.close();
           result.records.forEach((value,item)=>{
             //we verify if we have the restaurant in our object
-            console.log(value._fields[1].properties);
-            console.log(value._fields[2].properties);
             response.filter((value2,item2) => {
               if(value2.id === value._fields[2].properties.id){
                 //we storage it on an object
@@ -156,7 +154,6 @@ const resolvers = {
               );
             //Then we add it to the correct object in the array and delete the duplicate
             if(iteratorTool !== null){
-              console.log(`Agregara en ${iteratorTool.idChild}`)
               response[iteratorTool.idChild].items.push(
                 {
                     ...value._fields[1].properties,
@@ -190,10 +187,15 @@ const resolvers = {
         }
       ).then( async (result)=>{
         await session.close();
+        response = {
+          ...result.records[0]._fields[0].properties ,
+          restriction: []
+        };
         result.records.forEach((value,item)=>{
+          console.log(value._fields[2])
             //we verify if we have the restaurant in our object
-            response.filter((value2,item2) => {
-              if(value2.id === value._fields[0].properties.id){
+            response.restriction.filter((value2,item2) => {
+              if(value2.id === value._fields[1].properties.id){
                 //we storage it on an object
                 iteratorTool = {
                   idParent: item, 
@@ -201,31 +203,31 @@ const resolvers = {
                 };
               }
             });
-            console.log(value._fields[1].properties);
-            response.push(
+            //console.log(value._fields[1].properties);
+            response.restriction.push(
                 {
-                  ... value._fields[0].properties,
-                  restriction:[{
-                      ...value._fields[1].properties,
-                      type:value._fields[2].properties,
-                      values: [{...value._fields[3].properties}]
-                    }]
+                  ...value._fields[1].properties,
+                  type:value._fields[2].properties,
+                  values: [{...value._fields[3].properties}]
                 }
               );
             //Then we add it to the correct object in the array and delete the duplicate
             if(iteratorTool !== null){
-              response[iteratorTool.idChild].restriction.push(
+              response.restriction[iteratorTool.idChild].values.push(
                 {
-                  ...value._fields[1].properties,
-                      type:value._fields[2].properties,
-                      values: [{...value._fields[3].properties}]
+                  ...value._fields[3].properties
                 });
               
-              response.splice(iteratorTool.idChild-1,1);
+              response.restriction.splice(iteratorTool.idChild+1,1);
               iteratorTool = null;
             }
           });
       });
+
+      /*response.forEach((value,item)=>{
+
+      });*/
+
       return response; 
     }
   },
@@ -235,7 +237,7 @@ const resolvers = {
       let response = {};
       const getData = await session.run(
           'CREATE (r:restrictionType {id: randomUUID(),name: $name})return r',
-          {name: args.name}
+          {name: parseInt(args.name)}
         ).then((result)=>{
           response = {...result.records[0]._fields[0].properties};
         });
