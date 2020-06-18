@@ -37,3 +37,17 @@ functions:
           path: "{proxy+}"
           method: any
           cors: true
+  log:
+    handler: index.log
+    events:
+      - http:
+          path: "{proxy+}"
+          method: get
+          integration: lambda
+          authorizer:
+            name: test
+            arn: arn:aws:cognito-idp:eu-west-2:576795205019:userpool/eu-west-2_qBdHSxvDF
+            claims:
+              - email
+
+

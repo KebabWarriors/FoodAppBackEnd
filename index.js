@@ -7,3 +7,8 @@ const server = new ApolloServer({
 });
 
 exports.graphqlHandler = server.createHandler();
+
+
+exports.log = () => {
+
+};
