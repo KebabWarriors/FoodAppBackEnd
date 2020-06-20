@@ -1,5 +1,14 @@
 const encrypt = require('crypto');
 const { driver } = require('../../conf/connection.js');
+const {Lambda} = require('aws-sdk');
+
+const lambda =  new Lambda({
+  apiVersion: '2031',
+  endpoint: process.env.IS_OFFLINE ? 
+   'http://0.0.0.0:3002'
+    : 'https://lambda.us-east-2.amazonaws.com',
+});
+
 
 
 const typeDefs = `
@@ -27,7 +36,7 @@ const typeDefs = `
   extend type Mutation{
     addPerson(name: String, email: String, password: String,phone:String): Person
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
-    
+    addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
   }
 `;
 
@@ -123,6 +132,42 @@ const resolvers = {
           response = {...result.records[0]._fields[0].properties}
       }).catch((error) => {
         console.log(`error: ${error}`);
+      });
+      return response;
+    },
+    addAddressToPerson: async (parent, args)=>{
+      console.log(args.Address)
+      let newAddress;
+      let url = encodeURI(`${args.address}`);
+      await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${url}&key=AIzaSyASuTepGP3k9VxIPOO0cbnymrKINq3mI0c`,{
+        method: 'GET',
+        headers:{
+          "ContentType": "application/json"
+        }
+      }).then(response => response.json()).then((result) =>{
+        newAddress = result;
+        
+      })
+      
+      const session = driver.session();
+      let response = {};
+      const verifyIfDataExist = await session.run(`
+        merge (a:address{latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address})
+        with a
+        match (p:person) where p.id = $id
+        with a,p
+        merge (p)-[:HAS]->(a)
+        return a
+      `,{
+        lat: newAddress.results[0].geometry.location.lat,
+        lon: newAddress.results[0].geometry.location.lng,
+        build: args.build,
+        door: args.door,
+        id: args.person,
+        address: args.address
+      }).then(async (result)=>{
+        await session.close();
+        response = result.records[0]._fields[0].properties;
       });
       return response;
     }

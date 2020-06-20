@@ -23,6 +23,7 @@ const typeDefs = `
   }
 
   input DeliveryItem{
+    id: ID
     items: [DeliveryItemData]
   }
 
@@ -43,16 +44,29 @@ const resolvers = {
   Delivery:{
     addDelivery: (parent, args,context,info) => {
       console.log("addDelivery");
-      console.log(args.items)
-      console.log(info)
-      /*console.log(`add delivery`);
-      console.log({...args});
+      console.log(args.items.items)
       const session = driver.session();
       let response = {};
-      const setData = await session.run(`
-          
+      const dataToUse = args.items.items;      
+      /*const setData = await session.run(`
+         
+        create (d:delivery(id:randomUUID(),state:0))
+        with d
+        match (p:person) where u.id = $id
+        with d,p
+        create (p)-[:MADE]->(d)
+        with d,p
+        unwind $items as items 
+        merge (d)-[:HAS]->(di:deliveryItem(id:items.id,item:items.item,amount:items.amount))
+        with d,p,items,di
+        unwind items.restrictions as itemsRestrictions
+        merge (di)-[]->(r:restricionDeliveryItemData(restrictionId:itemsRestrictions.restrictionId,restrictionType:itemsRestrictions.restrictionType,restrictionValue:itemsRestrictions.restrictionValue))
+        return d,p,di,r
+      
         `,
-        {}
+        {
+
+        }
       ).then((result) => {
 
       }).catch((error) => {

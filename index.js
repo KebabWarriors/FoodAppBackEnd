@@ -12,3 +12,9 @@ exports.graphqlHandler = server.createHandler();
 exports.log = () => {
 
 };
+
+exports.geocoding = async (event) => {
+  return {
+    text: "PUTA LO LOGRAMOS"
+  }
+};

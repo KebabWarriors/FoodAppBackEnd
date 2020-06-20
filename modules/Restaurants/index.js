@@ -20,6 +20,7 @@ const typeDefs = `
 	extend type Query{
 		restaurant(id: ID): Restaurant
 		restaurants: [Restaurant]
+    restaurantsByType(id: ID): [Restaurant] 
 		restaurantsType: [RestaurantType]
 	}
 
@@ -46,6 +47,51 @@ const resolvers = {
 			});
 			return response;
 		},
+    restaurantsByType: async (parent, args) => {
+
+      console.log(`restaurants by type: ${args}`);
+      const session = driver.session();
+      let response = [];
+      //will help you to know if an id is inside of the object 
+      //and it is, it will give us the 
+      let iteratorTool = null;
+      const getData = await session.run(
+          `
+            match (r:restaurant)-[s:is_type]->(b),
+            (p:person)-[:owns]->(r) where b.id = $id
+            return r,s,b,p
+          `,
+          {id: args.id}
+        ).then((result) => {
+          result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+            response.filter((value2,item2) => {
+              if(value2.id === value._fields[0].properties.id){
+                //we storage it on an object
+                iteratorTool = {idParent: item, idChild: item2};
+              }
+            });
+          
+            response.push(
+                {
+                  ... value._fields[0].properties,
+                  owner:  value._fields[3].properties,
+                  type:  [{...value._fields[2].properties}]
+                }
+              );
+            //Then we add it to the correct object in the array and delete the duplicate
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].type.push({...result.records[iteratorTool.idParent]._fields[2].properties});
+              response.splice(iteratorTool.idChild-1,1);
+              iteratorTool = null;
+            }
+            
+          });
+          
+        });
+        return response;
+
+    },
     restaurant: async (parent, args) => {
       const session = driver.session();
       console.log(`restaurant: ${args}`);
