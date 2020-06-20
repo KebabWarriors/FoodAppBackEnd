@@ -11,7 +11,7 @@ const typeDefs = `
 		name: String
 		photo: String
 		generalPrice: Float
-		type: [RestaurantType],
+		type: [RestaurantType]
     owner: Person,
     address: String
     description: String
@@ -24,7 +24,7 @@ const typeDefs = `
 	}
 
 	extend type Mutation{
-		addRestaurantType(name: String): RestaurantType,
+		addRestaurantType(name: String): RestaurantType
     addRestaurant(name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
 	}
 `;

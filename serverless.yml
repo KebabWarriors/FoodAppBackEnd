@@ -41,7 +41,7 @@ functions:
     handler: index.log
     events:
       - http:
-          path: "{proxy+}"
+          path: "login"
           method: get
           integration: lambda
           authorizer:

@@ -1,12 +1,14 @@
 const { driver } = require('../../conf/connection.js');
 
 const typeDefs = `
+  
   type Item{
     id: ID
     name: String
     description: String
     type: ItemType
     price: Float
+
     restaurant: Restaurant
     restrictions: [Restriction]  
   }
@@ -22,8 +24,9 @@ const typeDefs = `
   }
 
   type Restriction{
-    id: ID,
+    id: ID
     name: String
+    required: Boolean
     type: RestrictionType
   }
 
@@ -48,14 +51,17 @@ const typeDefs = `
     id: ID
     name: String
     type: RestrictionType
+    required: Boolean    
     values: [RestrictionValueByItemData]
   }
 
+  #Equivalent of Item when returning Resctricions of Item
   type RestrictionByItem{
     id: ID
     name: String
     description: String
     price: Float
+
     restriction: [RestrictionValueByItem]
   }
 

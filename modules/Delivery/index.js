@@ -1,7 +1,7 @@
 const { driver } = require('../../conf/connection.js');
 
 const typeDefs = `
-
+  
   type Delivery{
     id: ID 
     user: Person
@@ -9,22 +9,30 @@ const typeDefs = `
     information: String
   }
 
-  query DeliveryInput{
-    item: ID
-    name: String
-    information: [RestrictionValueByItem ]
+  input DeliveryItemDataRestrictions{
+    restrictionId: ID
+    restrictionType: Int
+    restrictionValue: [EscalarBooleanOrStringOrInt]
   }
 
-  input InputDelivery{
-    deliveries: [DeliveryInput]
-  }  
+  input DeliveryItemData{
+    id: ID
+    item: String
+    amount: Int
+    restrictions: [DeliveryItemDataRestrictions]
+  }
+
+  input DeliveryItem{
+    items: [DeliveryItemData]
+  }
+
 
   extend type Query{
-   
+    delivery(id: ID): Delivery
   }
 
   extend type Mutation{
-    addDelivery(items: [InputDelivery]): Delivery
+    addDelivery(items: DeliveryItem): Delivery
   }
 
 `;
@@ -33,8 +41,23 @@ const resolvers = {
 
   },
   Delivery:{
-    addDelivery: (parent, args) => {
+    addDelivery: (parent, args,context,info) => {
+      console.log("addDelivery");
+      console.log(args.items)
+      console.log(info)
+      /*console.log(`add delivery`);
+      console.log({...args});
+      const session = driver.session();
+      let response = {};
+      const setData = await session.run(`
+          
+        `,
+        {}
+      ).then((result) => {
 
+      }).catch((error) => {
+        console.log(`error in add delivery ${error}`);
+      })*/
     }
   }
 }
