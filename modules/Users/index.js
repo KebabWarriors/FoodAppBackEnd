@@ -24,8 +24,8 @@ const typeDefs = `
     streetAddress: String
     build: String
     door: String
-    latitude: Float
-    longitude: Float
+    latitude: String
+    longitude: String
   }
 
   extend type Query{
@@ -136,10 +136,10 @@ const resolvers = {
       return response;
     },
     addAddressToPerson: async (parent, args)=>{
-      console.log(args.Address)
       let newAddress;
+      let tempAddress;
       let url = encodeURI(`${args.address}`);
-      await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${url}&key=AIzaSyASuTepGP3k9VxIPOO0cbnymrKINq3mI0c`,{
+      const getLatAndLng = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${url}&key=AIzaSyASuTepGP3k9VxIPOO0cbnymrKINq3mI0c`,{
         method: 'GET',
         headers:{
           "ContentType": "application/json"
@@ -147,29 +147,67 @@ const resolvers = {
       }).then(response => response.json()).then((result) =>{
         newAddress = result;
         
-      })
+      });
       
       const session = driver.session();
       let response = {};
-      const verifyIfDataExist = await session.run(`
-        merge (a:address{latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address})
-        with a
-        match (p:person) where p.id = $id
-        with a,p
-        merge (p)-[:HAS]->(a)
-        return a
-      `,{
-        lat: newAddress.results[0].geometry.location.lat,
-        lon: newAddress.results[0].geometry.location.lng,
-        build: args.build,
-        door: args.door,
-        id: args.person,
-        address: args.address
-      }).then(async (result)=>{
-        await session.close();
-        response = result.records[0]._fields[0].properties;
+
+      const verifyLocation = await session.run(
+        `
+          match (a:address) where a.latitude = $lat and a.longitude = $lon
+          return a 
+        `,
+        {
+          lat: newAddress.results[0].geometry.location.lat.toString(),
+          lon: newAddress.results[0].geometry.location.lng.toString()
+        }
+      ).then((result)=>{
+        tempAddress = result;
       });
-      return response;
+      console.log(tempAddress.records)
+      if(tempAddress.records.length > 0){
+        console.log(newAddress.records);
+          const createNewRelationship = await session.run(
+            `
+              match (p:person) where p.id = $id
+              with p
+              match (a:address) where a.id = $address
+              with a,p
+              merge (p)-[:HAS]->(a)
+              return a    
+            `,
+            {
+              id: args.person,
+              address: tempAddress.records[0]._fields[0].properties.id
+            }
+          ).then(async (result)=>{
+            await session.close();
+            response = result.records[0]._fields[0].properties;  
+          });
+      }else{
+        const createNewAddress = await session.run(`
+          create (a:address{id:randomUUID(),latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address})
+          with a
+          match (p:person) where p.id = $id
+          with a,p
+          merge (p)-[:HAS]->(a)
+          return a
+        `,
+        {
+          lat: newAddress.results[0].geometry.location.lat.toString(),
+          lon: newAddress.results[0].geometry.location.lng.toString(),
+          build: args.build,
+          door: args.door,
+          id: args.person,
+          address: args.address
+        }).then(async (result)=>{
+          await session.close();
+          response = result.records[0]._fields[0].properties;
+        });
+      }
+        return response;  
+
+      
     }
   }
 };
