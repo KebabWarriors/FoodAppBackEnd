@@ -1,4 +1,5 @@
 const neo4j  =  require("neo4j-driver");
+const dotenv = require("dotenv");
 
 const driver = neo4j.driver(
   'neo4j://localhost:7687',

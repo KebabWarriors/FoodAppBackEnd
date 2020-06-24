@@ -1,22 +1,13 @@
-const encrypt = require('crypto');
 const { driver } = require('../../conf/connection.js');
 const {Lambda} = require('aws-sdk');
-
-const lambda =  new Lambda({
-  apiVersion: '2031',
-  endpoint: process.env.IS_OFFLINE ? 
-   'http://0.0.0.0:3002'
-    : 'https://lambda.us-east-2.amazonaws.com',
-});
-
-
+const dotenv = require("dotenv");
+dotenv.config();
 
 const typeDefs = `
   type Person{
     id: ID
     name: String
     email: String
-    password: String
     phone: String
   }
 
@@ -43,6 +34,7 @@ const typeDefs = `
 const resolvers = {
   Query:{
     person: async (parent,args,context,info) => {
+      console.log(`Port ${process.env.NEO4J_PORT}`)
       console.log(`person: ${args}`);
       const session = driver.session();
       let response = {}
@@ -85,8 +77,8 @@ const resolvers = {
       
       const session = driver.session();
         const result = await session.run(
-          'CREATE (a:person {id: randomUUID(),name: $name,email: $email,password:$password,phone:$phone}) return a',
-          {name: args.name, email: args.email,password: args.password,phone: args.phone}
+          'CREATE (a:person {id: randomUUID(),name: $name,email: $email,phone:$phone}) return a',
+          {name: args.name, email: args.email,phone: args.phone}
         ).then(async (result) => {
           await session.close();
           //console.log(result.records[0]._fields[0].properties);

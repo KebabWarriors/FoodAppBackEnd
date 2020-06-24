@@ -20,6 +20,8 @@
   "dependencies": {
     "apollo-server-lambda": "^2.14.1",
     "aws-sdk": "^2.701.0",
+    "bcrypt": "^5.0.0",
+    "dotenv": "^8.2.0",
     "graphql": "^15.0.0",
     "neo4j-driver": "^4.0.2",
     "neo4j-graphql-js": "^2.14.2"
