@@ -7,6 +7,30 @@ const typeDefs = `
     user: Person
     state: Int
     information: String
+    total: Float
+  }
+
+  type MultipleDelivery{
+    id: ID 
+    user: Person
+    state: Int
+    information: String
+    total: Float
+    address: Address
+    restaurant: Restaurant
+    items: [MultipleDeliveryItemData]
+  }
+
+  type MultipleDeliveryItemData{
+    id: ID
+    item: String
+    restrictions: [MultipleDeliveryRestrictions]
+  }
+
+  type MultipleDeliveryRestrictions{
+    restrictionId: ID
+    restrictionType: Int
+    restrictionValue: [EscalarBooleanOrStringOrInt]
   }
 
   input DeliveryItemDataRestrictions{
@@ -18,7 +42,6 @@ const typeDefs = `
   input DeliveryItemData{
     id: ID
     item: String
-    amount: Int
     restrictions: [DeliveryItemDataRestrictions]
   }
 
@@ -32,6 +55,7 @@ const typeDefs = `
 
   extend type Query{
     delivery(id: ID): Delivery
+    deliveriesByUser(user: ID): [MultipleDelivery]
   }
 
   extend type Mutation{
@@ -41,23 +65,103 @@ const typeDefs = `
 `;
 const resolvers = {
   Query: {
+    deliveriesByUser: async (parent, args) =>{
+      console.log("deliveries");
+      const session = driver.session();
+      const setData = await session.run(`
+        match (d:delivery)-[]->(a:address),
+        (p:person)-[]->(d)-[]->(p),
+        (d)-[]->(di:deliveryItem)-[]->(rdid:restricionDeliveryItemData),
+        (d)-[]->(r:restaurant)-[]->(d) where p.id = $id
+        return d,a,p,di,rdid,r
+      `,{
+        id: args.user
+      }).then(async (result) => {
+        session.close();
+        let tempArray = [];
+        let validator = null;
+        result.records.forEach((value,item) => {
+          console.log(value._fields)
 
+          tempArray.filter((value2,item2) => {
+            if(value2.id === value._fields[0].id){
+              validator = items2;
+            }
+          });
+
+          if(validator !== null){
+
+          }
+          else{
+            tempArray.push({
+              ... value._fields[0].properties, 
+              user: {...value._fields[2].properties},
+              address: {... value._fields[1].properties},
+              restaurant: {... value_fields[5].properties},
+              items: [MultipleDeliveryRestrictions]
+
+            })
+          }
+        });
+        
+      });
+    }
   },
   Delivery:{
     addDelivery: async (parent, args,context,info) => {
       console.log("addDelivery");
-      console.log(args.items.user)
-      console.log(args.items.items)
+      let tempArray = [];
+      let validator = null;
+      const restrictionsValidator = (forComparing, toComparing) =>{
+        let isTheSame = true;
+        if(forComparing.length > 0){
+          for(let value in toComparing){
+          
+            if(String(forComparing[value]) !== String(toComparing[value])){
+              isTheSame = false;
+              break;
+            }
+          }
+        }
+        
+        return isTheSame;
+      };
+      args.items.items.forEach((value,key) => {
+        tempArray.filter((value2,key2)=>{
+          if(value2.id === value.id && restrictionsValidator(value2.restrictions, value.restrictions)){
+               
+            validator = {
+              idChild: key2,
+              idParent: key
+            }
+          }
+         
+        });
+       
+          
+          if(validator !== null){
+            
+            tempArray[validator.idChild].amount += 1;
+            
+            validator = null;
+          }else{
+            tempArray.push({...value});
+          }
+
+      });
+     
       const session = driver.session();
       let response = {};
       const dataToUse = args.items.items;      
       const setData = await session.run(`
-         
-        create (d:delivery{id:randomUUID(),state:0})
+        unwind $items as items
+        match (i:item) where i.id = items.id
+        with sum(i.price * items.amount) as price
+        create (d:delivery{id:randomUUID(),state:0,total:price})
         with d
         match (p:person) where p.id = $id
         with d,p
-        create (p)-[:MADE]->(d)<-[:IS_FROM]-(p)
+        create (p)-[:MADE]->(d)-[:IS_FROM]->(p)
         with d,p
         match (res:restaurant) where res.id = $restaurant
         with d,p,res 
@@ -81,24 +185,23 @@ const resolvers = {
           id:args.items.user,
           restaurant: args.items.restaurant,
           address: args.items.address,
-          items: args.items.items
-
+          items: tempArray
         }
-      ).then((result) => {
-        console.log(result.records)
+      ).then(async (result) => {
+        session.close();
+        response = {
+          id: result.records[0]._fields[0].properties.id,
+          state: result.records[0]._fields[0].properties.state,
+          user: {
+            ... result.records[0]._fields[1].properties
+          }
+        }
+        console.log(result.records[0]._fields[0])
+        
       }).catch((error) => {
         console.log(`error in add delivery ${error}`);
       })
-      return {
-        id: "144494",
-        user: {
-          id: "asdasd",
-          name: "asdasd",
-          email: "asdasd"
-        },
-        state: 0,
-        information: "Solo prueba"
-      };
+      return response;
     }
   }
 }

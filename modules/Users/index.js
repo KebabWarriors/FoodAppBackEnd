@@ -1,7 +1,12 @@
 const { driver } = require('../../conf/connection.js');
 const {Lambda} = require('aws-sdk');
 const dotenv = require("dotenv");
+
+
+
 dotenv.config();
+
+
 
 const typeDefs = `
   type Person{
@@ -19,22 +24,30 @@ const typeDefs = `
     longitude: String
   }
 
+  input NewUser{
+    name: String
+    email: String
+    phone: String
+    password: String
+  }
+
   extend type Query{
     person(id: ID): Person 
     people: [Person]
+    login: Person
   }
 
   extend type Mutation{
     addPerson(name: String, email: String, password: String,phone:String): Person
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
     addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
+    signPerson(person: NewUser): Person
   }
 `;
 
 const resolvers = {
   Query:{
     person: async (parent,args,context,info) => {
-      console.log(`Port ${process.env.NEO4J_PORT}`)
       console.log(`person: ${args}`);
       const session = driver.session();
       let response = {}
@@ -65,7 +78,8 @@ const resolvers = {
           console.log(`error ${error}`);
         });
         return response;
-    }
+    },
+    
 
     
   },

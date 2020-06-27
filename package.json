@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/KebabWarriors/FoodAppBackEnd#readme",
   "dependencies": {
+    "amazon-cognito-identity-js": "^4.3.2",
     "apollo-server-lambda": "^2.14.1",
     "aws-sdk": "^2.701.0",
     "bcrypt": "^5.0.0",
