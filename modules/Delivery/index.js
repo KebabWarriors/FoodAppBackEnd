@@ -8,6 +8,7 @@ const typeDefs = `
     state: Int
     information: String
     total: Float
+    date: String
   }
 
   type MultipleDelivery{
@@ -30,18 +31,19 @@ const typeDefs = `
   type MultipleDeliveryRestrictions{
     restrictionId: ID
     restrictionType: Int
-    restrictionValue: [EscalarBooleanOrStringOrInt]
+    restrictionValue: [ScalarBooleanOrStringOrInt]
   }
 
   input DeliveryItemDataRestrictions{
     restrictionId: ID
     restrictionType: Int
-    restrictionValue: [EscalarBooleanOrStringOrInt]
+    restrictionValue: [ScalarBooleanOrStringOrInt]
   }
 
   input DeliveryItemData{
     id: ID
     item: String
+    amount: Int
     restrictions: [DeliveryItemDataRestrictions]
   }
 
@@ -68,6 +70,8 @@ const resolvers = {
     deliveriesByUser: async (parent, args) =>{
       console.log("deliveries");
       const session = driver.session();
+      let tempArray = [];
+      let validator = null;
       const setData = await session.run(`
         match (d:delivery)-[]->(a:address),
         (p:person)-[]->(d)-[]->(p),
@@ -78,33 +82,52 @@ const resolvers = {
         id: args.user
       }).then(async (result) => {
         session.close();
-        let tempArray = [];
-        let validator = null;
+        
         result.records.forEach((value,item) => {
-          console.log(value._fields)
-
+         
           tempArray.filter((value2,item2) => {
-            if(value2.id === value._fields[0].id){
-              validator = items2;
+
+            if(value2.id === value._fields[0].properties.id){
+              
+              validator = item2;
             }
           });
 
           if(validator !== null){
-
+            
+            tempArray[validator].items.push({
+                ... value._fields[3].properties,
+                restrictions: value._fields[4].properties
+              });
+            validator = null;
           }
           else{
             tempArray.push({
               ... value._fields[0].properties, 
               user: {...value._fields[2].properties},
               address: {... value._fields[1].properties},
-              restaurant: {... value_fields[5].properties},
-              items: [MultipleDeliveryRestrictions]
-
+              restaurant: {... value._fields[5].properties},
+              items: [{
+                ... value._fields[3].properties,
+                restrictions: value._fields[4].properties
+              }],
             })
           }
         });
-        
+        tempArray.forEach((value,item)=>{
+          
+          value.items.forEach((value2,item2)=>{
+            value.items.filter((value3,item3)=>{
+              if(value2.id === value3.id){
+                
+              }
+            });
+            console.log(value2.id)
+            console.log(value2.restrictions)
+          })
+        });
       });
+      return tempArray;
     }
   },
   Delivery:{
@@ -116,8 +139,8 @@ const resolvers = {
         let isTheSame = true;
         if(forComparing.length > 0){
           for(let value in toComparing){
-          
-            if(String(forComparing[value]) !== String(toComparing[value])){
+            console.log(forComparing[value])
+            if(JSON.stringify(forComparing[value]) !== JSON.stringify(toComparing[value])){
               isTheSame = false;
               break;
             }
@@ -157,7 +180,7 @@ const resolvers = {
         unwind $items as items
         match (i:item) where i.id = items.id
         with sum(i.price * items.amount) as price
-        create (d:delivery{id:randomUUID(),state:0,total:price})
+        create (d:delivery{id:randomUUID(),state:0,total:price,date:$date})
         with d
         match (p:person) where p.id = $id
         with d,p
@@ -185,13 +208,13 @@ const resolvers = {
           id:args.items.user,
           restaurant: args.items.restaurant,
           address: args.items.address,
-          items: tempArray
+          items: tempArray,
+          date: new Date().toISOString()
         }
       ).then(async (result) => {
         session.close();
         response = {
-          id: result.records[0]._fields[0].properties.id,
-          state: result.records[0]._fields[0].properties.state,
+          ... result.records[0]._fields[0].properties,
           user: {
             ... result.records[0]._fields[1].properties
           }

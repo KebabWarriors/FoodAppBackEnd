@@ -2,41 +2,14 @@ const { typeDefs: usersSchema, resolvers: usersResolver } = require('./modules/U
 const { typeDefs: restaurantsSchema, resolvers: restaurantsResolver } = require('./modules/Restaurants');
 const { typeDefs: itemsSchema, resolvers: itemsResolver } = require('./modules/Items');
 const { typeDefs: deliverySchema, resolvers: deliveryResolver } = require('./modules/Delivery');
+const { myScalars, myScalarsNames} = require('./modules/PersonalizedScalars');
 const { gql } = require('apollo-server-lambda');
-const { GraphQLScalarType, Kind } = require('graphql');
 
-const escalarBoolenOrStringOrInt = new GraphQLScalarType({
-  name: 'EscalarBooleanOrStringOrInt',
-  description: 'Optional escalar wwhen you recive',
-  serialize(value){
-    if(typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
-      throw new Error("escarlarBooleanOrStringOrInt must be either a String, number or boolean");
-    if(typeof value === "number" && !Number.isInteger(value))
-      throw new Error("escarlarBooleanOrStringOrInt must be an Integer, sorry for the inconvenients");
-    return value;
-  },
-  parseValue(value){
-    if(typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean")
-      throw new Error("escarlarBooleanOrStringOrInt must be either a String, number or boolean");
-    if(typeof value === "number" && !Number.isInteger(value))
-      throw new Error("escarlarBooleanOrStringOrInt must be an Integer, sorry for the inconvenients");
-    return value;
-  }, 
-  parseLiteral(result){
-    switch(result.Kind){
-      case Kind.INT:
-        return parseInt(result.value);
-      case Kind.STRING:
-        return result.value;
-      case Kind.BOOLEAN:
-        return (result.value == 'true') ? true : false;
-    }
-  }
-});
 
 const typeDefs = gql`
-  scalar EscalarBooleanOrStringOrInt
-
+  
+  ${myScalarsNames}
+  
   ${usersSchema}
 
   ${restaurantsSchema}
@@ -53,7 +26,7 @@ const resolvers = {
     ... itemsResolver.Query,
     ... deliveryResolver.Query
   },
-  EscalarBooleanOrStringOrInt: escalarBoolenOrStringOrInt, 
+  ... myScalars,
   Mutation:{
     ... usersResolver.User,
     ... restaurantsResolver.Restaurant,

@@ -1,12 +1,16 @@
 const { driver } = require('../../conf/connection.js');
-const {Lambda} = require('aws-sdk');
+const aws = require('aws-sdk');
+const AmazonCognitoIdentity = require('amazon-cognito-identity-js');
 const dotenv = require("dotenv");
-
-
 
 dotenv.config();
 
+const poolData = {
+  UserPoolId : process.env.COGNITO_USER_POOL_ID,
+  ClientId: process.env.COGNITO_USER_POOL_CLIENT
+}
 
+const userPool = new AmazonCognitoIdentity.CognitoUserPool(poolData);
 
 const typeDefs = `
   type Person{
@@ -28,7 +32,7 @@ const typeDefs = `
     name: String
     email: String
     phone: String
-    password: String
+    
   }
 
   extend type Query{
@@ -38,7 +42,7 @@ const typeDefs = `
   }
 
   extend type Mutation{
-    addPerson(name: String, email: String, password: String,phone:String): Person
+    addPerson(id:ID): Person
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
     addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
     signPerson(person: NewUser): Person
@@ -79,9 +83,6 @@ const resolvers = {
         });
         return response;
     },
-    
-
-    
   },
   User:{
     addPerson: async (parent, args) => {
@@ -91,8 +92,8 @@ const resolvers = {
       
       const session = driver.session();
         const result = await session.run(
-          'CREATE (a:person {id: randomUUID(),name: $name,email: $email,phone:$phone}) return a',
-          {name: args.name, email: args.email,phone: args.phone}
+          'CREATEz (a:person {id: $id}) return a',
+          {id: args.id}
         ).then(async (result) => {
           await session.close();
           //console.log(result.records[0]._fields[0].properties);
