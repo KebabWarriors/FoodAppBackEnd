@@ -28,6 +28,11 @@ const typeDefs = `
     longitude: String
   }
 
+  type Cards{
+    lastDigits: Int
+    token: String
+  }
+
   input NewUser{
     name: String
     email: String
@@ -39,6 +44,8 @@ const typeDefs = `
     person(id: ID): Person 
     people: [Person]
     login: Person
+    cardsByUser(id: ID): [Cards]
+    addressByUser(id: ID): [Address]
   }
 
   extend type Mutation{
@@ -83,6 +90,36 @@ const resolvers = {
         });
         return response;
     },
+    cardsByUser: async (parent, args) => {
+      console.log(`cards`);
+      const session = driver.session();
+      let response = [];
+      const result = await session.run(
+        `match (c:card)<-[]-(p:person) where p.id = $id return c`,
+        {id: args.id}
+      ).then(async (result) =>{
+        await session.close();
+        result.records.forEach((value,item)=>{
+          response.push({...value._fields[0].properties})
+        });
+      });
+      return response;
+    },
+    addressByUser: async (parent, args) => {
+      console.log(`address`);
+      const session = driver.session();
+      let response = [];
+      const result = await session.run(
+        `match (p:person)-[:HAS]->(a:address) where p.id = $id return a`,
+        {id: args.id}
+      ).then(async (result) =>{
+        await session.close();
+        result.records.forEach((value,item)=>{
+          response.push({...value._fields[0].properties})
+        });
+      });
+      return response;
+    }
   },
   User:{
     addPerson: async (parent, args) => {
@@ -92,7 +129,7 @@ const resolvers = {
       
       const session = driver.session();
         const result = await session.run(
-          'CREATEz (a:person {id: $id}) return a',
+          'CREATE (a:person {id: $id}) return a',
           {id: args.id}
         ).then(async (result) => {
           await session.close();
