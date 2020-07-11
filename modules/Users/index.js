@@ -26,9 +26,11 @@ const typeDefs = `
     door: String
     latitude: String
     longitude: String
+    id: ID
   }
 
   type Cards{
+    id: ID
     lastDigits: Int
     token: String
   }
@@ -105,16 +107,30 @@ const resolvers = {
       });
       return response;
     },
-    addressByUser: async (parent, args) => {
+    addressByUser: async (parent, args,context,info) => {
       console.log(`address`);
+      console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
+      const token = context.headers.authorization.split(" ")[1];
+      let userId = null;
+      const userToken = await fetch(`https://s12d1mg7u6.execute-api.eu-west-1.amazonaws.com/develop/users`,{
+	method: 'POST',
+        headers:{
+          "token": token
+      	}
+      }).then((response) => response.json()).then((result)=>{
+	userId = result;
+	console.log(result);
+      }).catch(error => console.log(`ERROR ${error}`));
+	console.log(userId);
       const session = driver.session();
       let response = [];
       const result = await session.run(
         `match (p:person)-[:HAS]->(a:address) where p.id = $id return a`,
-        {id: args.id}
+        {id: userId}
       ).then(async (result) =>{
         await session.close();
         result.records.forEach((value,item)=>{
+	   console.log(`${value._fields[0].properties}`);
           response.push({...value._fields[0].properties})
         });
       });

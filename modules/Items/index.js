@@ -8,7 +8,7 @@ const typeDefs = `
     description: String
     type: ItemType
     price: Float
-
+    image: String
     restaurant: Restaurant
     restrictions: [Restriction]  
   }

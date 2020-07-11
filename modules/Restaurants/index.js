@@ -4,12 +4,13 @@ const typeDefs = `
 	type RestaurantType{
 		id: ID
 		name: String
+		image: String
 	}
 
 	type Restaurant{
 		id: ID
 		name: String
-		photo: String
+		image: String
 		generalPrice: Float
 		type: [RestaurantType]
     owner: Person,
@@ -210,7 +211,7 @@ const resolvers = {
       const getData = await session.run(
         ` match (p:person) where p.id = $owner 
           with p as pe 
-          create (r:restaurant {id: randomUUID(), name: $name, photo: $photo,address: $address,description:$description}) 
+          create (r:restaurant {id: randomUUID(), name: $name, image: $photo,address: $address,description:$description}) 
           with pe,r
           match (rt:restaurantsType) where ${alias} 
           with collect(rt) as myList,pe,r
