@@ -92,13 +92,25 @@ const resolvers = {
         });
         return response;
     },
-    cardsByUser: async (parent, args) => {
+    cardsByUser: async (parent, args,context,info) => {
       console.log(`cards`);
+      console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
+      const token = context.headers.authorization.split(" ")[1];
+      let userId = null;
+      const userToken = await fetch(`https://muieumk3sa.execute-api.eu-west-1.amazonaws.com/Development/users`,{
+	method: 'POST',
+        headers:{
+          "token": token
+      	}
+      }).then((response) => response.json()).then((result)=>{
+	userId = result;
+	console.log(result);
+      }).catch(error => console.log(`ERROR ${error}`));
       const session = driver.session();
       let response = [];
       const result = await session.run(
         `match (c:card)<-[]-(p:person) where p.id = $id return c`,
-        {id: args.id}
+        {id: userId}
       ).then(async (result) =>{
         await session.close();
         result.records.forEach((value,item)=>{
@@ -112,7 +124,7 @@ const resolvers = {
       console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       const token = context.headers.authorization.split(" ")[1];
       let userId = null;
-      const userToken = await fetch(`https://s12d1mg7u6.execute-api.eu-west-1.amazonaws.com/develop/users`,{
+      const userToken = await fetch(`https://muieumk3sa.execute-api.eu-west-1.amazonaws.com/Development/users`,{
 	method: 'POST',
         headers:{
           "token": token
