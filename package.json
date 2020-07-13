@@ -25,7 +25,8 @@
     "dotenv": "^8.2.0",
     "graphql": "^15.0.0",
     "neo4j-driver": "^4.0.2",
-    "neo4j-graphql-js": "^2.14.2"
+    "neo4j-graphql-js": "^2.14.2",
+    "stripe": "^8.69.0"
   },
   "devDependencies": {
     "serverless-offline": "^6.3.0"

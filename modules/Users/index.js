@@ -32,7 +32,6 @@ const typeDefs = `
   type Cards{
     id: ID
     lastDigits: Int
-    token: String
   }
 
   input NewUser{
