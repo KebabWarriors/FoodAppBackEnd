@@ -2,8 +2,10 @@ const { driver } = require('../../conf/connection.js');
 const aws = require('aws-sdk');
 const AmazonCognitoIdentity = require('amazon-cognito-identity-js');
 const dotenv = require("dotenv");
-
+const Stripe = require("stripe");
+const stripe = Stripe(process.env.STRIPE_KEY);
 dotenv.config();
+
 
 const poolData = {
   UserPoolId : process.env.COGNITO_USER_POOL_ID,
@@ -32,6 +34,7 @@ const typeDefs = `
   type Cards{
     id: ID
     lastDigits: Int
+    type: String
   }
 
   input NewUser{
@@ -51,6 +54,7 @@ const typeDefs = `
 
   extend type Mutation{
     addPerson(id:ID): Person
+    addDriver(email: String): Person 
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
     addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
     signPerson(person: NewUser): Person
@@ -93,10 +97,10 @@ const resolvers = {
     },
     cardsByUser: async (parent, args,context,info) => {
       console.log(`cards`);
-      console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
+      //console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       const token = context.headers.authorization.split(" ")[1];
       let userId = null;
-      const userToken = await fetch(`https://muieumk3sa.execute-api.eu-west-1.amazonaws.com/Development/users`,{
+      const userToken = await fetch(`${process.env.COGNITO_TOKEN_VERIFICATION_URL}`,{
 	method: 'POST',
         headers:{
           "token": token
@@ -123,7 +127,7 @@ const resolvers = {
       console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       const token = context.headers.authorization.split(" ")[1];
       let userId = null;
-      const userToken = await fetch(`https://muieumk3sa.execute-api.eu-west-1.amazonaws.com/Development/users`,{
+      const userToken = await fetch(`${process.env.COGNITO_TOKEN_VERIFICATION_URL}`,{
 	method: 'POST',
         headers:{
           "token": token
@@ -152,12 +156,24 @@ const resolvers = {
     addPerson: async (parent, args) => {
       console.log(`addPerson: ${args}`);
       let person = {};
-      
+      let myCostumer  = {}
+     stripe.costumers.create({
+	name: args.id
+     }, (error, costumer) =>
+	{
+	  if(error){
+		console.log(`ERROR! ${error}`);
+	  }
+	myCostumer = costumer;
+     }); 
       
       const session = driver.session();
         const result = await session.run(
-          'CREATE (a:person {id: $id}) return a',
-          {id: args.id}
+          'CREATE (a:person {id: $id,costumerID: $costumer}) return a',
+          {
+	    id: args.id,
+	    costumer: myCostumer.id
+	  }
         ).then(async (result) => {
           await session.close();
           //console.log(result.records[0]._fields[0].properties);
@@ -166,6 +182,18 @@ const resolvers = {
           return  {id: 0,name: "error", email: "error",password: "error",phone: "error"}
         });
         return person;
+    },
+    addDriver: async (parent,args,context,info) => {
+	console.log('addDrvier');
+	let userId = "";	
+	const newUser = await fetch(`${process.env.COGNITO_CREATE_DRIVER_URL}`,{
+	  method: 'POST',
+          body: JSON.stringify({email: args.id})
+         }).then((response) => response.json()).then((result)=>{
+	   userId = result;
+	   console.log(result);
+      	}).catch(error => console.log(`ERROR ${error}`));
+;
     },
     updatePerson: async (parent, args) => {
       console.log(`updatePerson: ${args}`);
