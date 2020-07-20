@@ -188,7 +188,7 @@ const resolvers = {
 	let userId = "";	
 	const newUser = await fetch(`${process.env.COGNITO_CREATE_DRIVER_URL}`,{
 	  method: 'POST',
-          body: JSON.stringify({email: args.id})
+          body: JSON.stringify({email: args.email})
          }).then((response) => response.json()).then((result)=>{
 	   userId = result;
 	   console.log(result);
