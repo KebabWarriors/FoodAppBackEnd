@@ -1,40 +1,43 @@
 const { driver } = require('../../conf/connection.js');
 
 const typeDefs = `
-	type RestaurantType{
-		id: ID
-		name: String
-		image: String
-	}
+	
+  type RestaurantType{
+    id: ID
+    name: String
+    image: String
+  }
 
-	type Restaurant{
-		id: ID
-		name: String
-		image: String
-		generalPrice: Float
-		type: [RestaurantType]
+  type Restaurant{
+    id: ID
+    name: String
+    image: String
+    generalPrice: Float
+    type: [RestaurantType]
     owner: Person,
     address: String
     description: String
-	}
+  }
 
-	extend type Query{
-		restaurant(id: ID): Restaurant
-		restaurants: [Restaurant]
+  extend type Query{
+    restaurant(id: ID): Restaurant
+    restaurants: [Restaurant]
+    restaurantsWithoutType: [Restaurant]
     restaurantsByType(id: ID): [Restaurant] 
-		restaurantsType: [RestaurantType]
-	}
+    restaurantsType: [RestaurantType]
+  }
 
-	extend type Mutation{
-		addRestaurantType(name: String): RestaurantType
+  extend type Mutation{
+    addRestaurantType(name: String): RestaurantType
+    addRestaurantWithOwner(name: String, owner: String): Restaurant
     addRestaurant(name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
-	}
+  }
 `;
 
 const resolvers = {
 	Query:{
 		restaurantsType: async (parent, args) => {
-      console.log(`restaurantsType: ${args}`);
+      		console.log(`restaurantsType: ${args}`);
 			const session = driver.session();
 			let response = [];
 			const getData = await session.run(
@@ -132,6 +135,36 @@ const resolvers = {
       });
       return response[0];
     }, 
+    restaurantsWithoutType: async (parent, args) => {
+      console.log(`restaurants whitouttype: ${args}`);
+      const session = driver.session();
+      let response = [];
+      //will help you to know if an id is inside of the object 
+      //and it is, it will give us the 
+      let iteratorTool = null;
+      const getData = await session.run(
+          `
+            match (r:restaurant),
+            (p:person)-[:owns]->(r) 
+            return r,p
+          `,
+          {}
+        ).then((result) => {
+          result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+             response.push(
+                {
+                  ... value._fields[0].properties,
+                  owner:  value._fields[1].properties,
+                }
+              );
+            
+            
+          });
+          
+        });
+        return response;
+    },
     restaurants: async (parent, args) => {
       console.log(`restaurants: ${args}`);
       const session = driver.session();
@@ -191,6 +224,64 @@ const resolvers = {
       });
       return response;
     },
+    addRestaurantWithOwner: async (parent,args) =>{
+	console.log(`Add restaurant with owner`);
+	let newOwner;
+	let response = {};
+	const session = driver.session();
+	//Firts we verify if we have the user in our internal database
+	const verifyUserOnStore = await session.run(`
+	  match (p:person) where p.email = $email return p
+	`,
+	{
+	  email: args.owner
+	}).then(async (result)=>{
+	 if(result.records.length === 0){
+	   //Send data to lambda to sign up in cognito
+	    const newUser = await fetch(`${process.env.COGNITO_CREATE_RESTAURANT_OWNER_URL}`,{
+	      method: 'POST',
+              body: JSON.stringify({email: args.owner})
+            }).then((response) => response.json()).then((result)=>{
+	      newOwner = result.userSub;
+	      console.log(result);
+      	    }).catch(error => console.log(`ERROR ${error}`));  	 	 	
+	   
+	   //Starting our internal data	
+	   const setData = await session.run(`
+	    create (r:restaurant{id: randomUUID(),name: $name})
+	    with r
+	    create (p:person{id:$id,email:$email})
+	    with r,p
+	    merge (p)-[:owns]->(r) 
+	    return r
+	  `,{
+		name: args.name,
+		id: newOwner,
+		email: args.owner
+	  }).then((newResult)=>{
+	    response = newResult.records[0]._fields[0].properties;
+	  }).cath(error => console.log(`ERROR AT DATABASE ${error}`));
+	 }else{
+	   newOwner = result.records[0]._fields[0].properties.id;
+	    //Starting our internal data	
+	   const setData = await session.run(`
+	    match (r:restaurant{id: randomUUID(),name: $name})
+	    with r
+	    match (p:person) where p.id = $id
+	    with r,p
+	    merge (p)-[:owns]->(r) 
+	    return r
+	  `,{
+		  name: args.name,
+		  id: newOwner
+	   }).then((newResult)=>{
+	    response = newResult.records[0]._fields[0].properties;
+	   }).cath(error => console.log(`ERROR AT DATABASE ${error}`));
+	 }
+
+	}); 
+	return response;	
+    },
     addRestaurant: async (parent, args) =>{
       console.log(`addRestaurant: ${args}`);
       const session = driver.session();
@@ -198,6 +289,9 @@ const resolvers = {
       let params = {};
       let alias = ``;
       let counter = 0;
+	/*
+	 *  ForEach type we send, we assign an alias for them to save on the restaurant
+	 * */
       args.type.forEach((item) => {
         
         if(counter === 0){

@@ -209,7 +209,7 @@ const resolvers = {
     },
     addDriver: async (parent,args,context,info) => {
 	console.log('addDrvier');
-	console.log(JSON.stringify(args));
+	//console.log(JSON.stringify(args));
 	let userId = "";
 	let person = {};
 	const newUser = await fetch(`${process.env.COGNITO_CREATE_DRIVER_URL}`,{
