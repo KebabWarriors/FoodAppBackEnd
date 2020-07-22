@@ -18,6 +18,9 @@ const typeDefs = `
   type Person{
     id: ID
     name: String
+    lastname: String
+    dui: String
+    address: String
     email: String
     phone: String
   }
@@ -47,6 +50,7 @@ const typeDefs = `
   extend type Query{
     person(id: ID): Person 
     people: [Person]
+    drivers: [Person]
     login: Person
     cardsByUser(id: ID): [Cards]
     addressByUser(id: ID): [Address]
@@ -54,11 +58,12 @@ const typeDefs = `
 
   extend type Mutation{
     addPerson(id:ID): Person
-    addDriver(email: String): Person 
+    addDriver(email: String!, name: String!, lastname: String!, dui: String!,address: String!, phone: String!): Person 
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
     addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
     signPerson(person: NewUser): Person
   }
+ 
 `;
 
 const resolvers = {
@@ -95,6 +100,25 @@ const resolvers = {
         });
         return response;
     },
+    drivers: async (parent,args) => {
+      console.log(`people: ${args}`);
+      const session = driver.session();
+      let response = [];
+      const result = await  session.run(
+          'MATCH (p:person) where p.type = 2 return p',
+          {}
+        ).then(async (result) => {
+          await session.close();
+          result.records.forEach((value, key) => {
+            response.push({...value._fields[0].properties});
+          });
+          //console.log(result)
+        }).catch((error) => {
+          console.log(`error ${error}`);
+        });
+        return response;
+    },
+
     cardsByUser: async (parent, args,context,info) => {
       console.log(`cards`);
       //console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
@@ -157,19 +181,19 @@ const resolvers = {
       console.log(`addPerson: ${args}`);
       let person = {};
       let myCostumer  = {}
-     stripe.costumers.create({
-	name: args.id
-     }, (error, costumer) =>
+     	stripe.costumers.create({
+		name: args.id
+     	}, (error, costumer) =>
 	{
 	  if(error){
 		console.log(`ERROR! ${error}`);
 	  }
-	myCostumer = costumer;
-     }); 
+		myCostumer = costumer;
+     	}); 
       
-      const session = driver.session();
+      	const session = driver.session();
         const result = await session.run(
-          'CREATE (a:person {id: $id,costumerID: $costumer}) return a',
+          'CREATE (a:person {id: $id,costumerID: $costumer, type: 5}) return a',
           {
 	    id: args.id,
 	    costumer: myCostumer.id
@@ -185,7 +209,9 @@ const resolvers = {
     },
     addDriver: async (parent,args,context,info) => {
 	console.log('addDrvier');
-	let userId = "";	
+	console.log(JSON.stringify(args));
+	let userId = "";
+	let person = {};
 	const newUser = await fetch(`${process.env.COGNITO_CREATE_DRIVER_URL}`,{
 	  method: 'POST',
           body: JSON.stringify({email: args.email})
@@ -193,7 +219,33 @@ const resolvers = {
 	   userId = result;
 	   console.log(result);
       	}).catch(error => console.log(`ERROR ${error}`));
-;
+	const session = driver.session();
+	const result = await session.run(`CREATE (p:person {
+		id: $id,
+		email: $email,
+		type: 2,
+		name: $name, 
+		lastname: $lastname, 
+		dui: $dui, 
+		address: $address, 
+		phone: $phone
+	  }) return p`,
+	  {
+	    id: userId.userSub,
+	    email: args.email,
+	    name: args.name,
+	    lastname: args.lastname,
+	    dui: args.dui,
+	    address: args.address,
+	    phone: args.phone
+	  }).then(async (result) => {
+          await session.close();
+          //console.log(result.records[0]._fields[0].properties);
+          person = result.records[0]._fields[0].properties;
+        }).catch((error) =>{
+          return  {id: 0,name: "error", email: "error",password: "error",phone: "error"}
+        });	
+	return person;
     },
     updatePerson: async (parent, args) => {
       console.log(`updatePerson: ${args}`);
