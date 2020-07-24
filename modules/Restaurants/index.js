@@ -21,6 +21,7 @@ const typeDefs = `
 
   extend type Query{
     restaurant(id: ID): Restaurant
+    restaurantsByOwner(owner: String): [Restaurant]
     restaurants: [Restaurant]
     restaurantsWithoutType: [Restaurant]
     restaurantsByType(id: ID): [Restaurant] 
@@ -30,27 +31,27 @@ const typeDefs = `
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    addRestaurant(name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
+    addRestaurant(id:String,name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
   }
 `;
 
 const resolvers = {
-	Query:{
-		restaurantsType: async (parent, args) => {
-      		console.log(`restaurantsType: ${args}`);
-			const session = driver.session();
-			let response = [];
-			const getData = await session.run(
-				'MATCH (r:restaurantsType) return r',
-				{}
-			).then(async (result) => {
-				await session.close();
-				result.records.forEach((value, key) => {
-					response.push({...value._fields[0].properties})
-				});
-			});
-			return response;
-		},
+  Query:{
+    restaurantsType: async (parent, args) => {
+      console.log(`restaurantsType: ${args}`);
+	const session = driver.session();
+	let response = [];
+	const getData = await session.run(
+	'MATCH (r:restaurantsType) return r',
+	{}
+	).then(async (result) => {
+	  await session.close();
+	  result.records.forEach((value, key) => {
+	    response.push({...value._fields[0].properties})
+	  });
+	});
+     return response;
+    },
     restaurantsByType: async (parent, args) => {
 
       console.log(`restaurants by type: ${args}`);
@@ -305,7 +306,7 @@ const resolvers = {
       const getData = await session.run(
         ` match (p:person) where p.id = $owner 
           with p as pe 
-          create (r:restaurant {id: randomUUID(), name: $name, image: $photo,address: $address,description:$description}) 
+          match (r:restaurant) set name = $name, image = $photo,address = $address,description = $description where p.id = $id 
           with pe,r
           match (rt:restaurantsType) where ${alias} 
           with collect(rt) as myList,pe,r
