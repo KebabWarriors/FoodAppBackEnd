@@ -121,6 +121,7 @@ const resolvers = {
 
     cardsByUser: async (parent, args,context,info) => {
       console.log(`cards`);
+      console.log(JSON.stringify(args));
       //console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       const token = context.headers.authorization.split(" ")[1];
       let userId = null;
@@ -131,7 +132,7 @@ const resolvers = {
       	}
       }).then((response) => response.json()).then((result)=>{
 	userId = result;
-	console.log(result);
+	//console.log(result);
       }).catch(error => console.log(`ERROR ${error}`));
       const session = driver.session();
       let response = [];

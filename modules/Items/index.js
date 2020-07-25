@@ -45,6 +45,7 @@ const typeDefs = `
   type RestrictionValueByItemData{
     id: ID
     value: String
+    price: Float
   }
 
   type RestrictionValueByItem{
@@ -52,6 +53,7 @@ const typeDefs = `
     name: String
     type: RestrictionType
     required: Boolean    
+    quantity: Int
     values: [RestrictionValueByItemData]
   }
 
@@ -61,15 +63,21 @@ const typeDefs = `
     name: String
     description: String
     price: Float
-
     restriction: [RestrictionValueByItem]
   }
 
 
+  input ValueByItemData{
+    value: String
+    price: Float
+  }
+
   input StorageRestrictions{
     idRestrictionType: ID
     nameResctriction: String
-    valuesResctriction: [String]
+    required: Boolean
+    quantity: Int
+    valuesResctriction: [ValueByItemData]
   }
 
   extend type Query{
@@ -77,6 +85,8 @@ const typeDefs = `
     itemsByRestaurant(id: ID): [Item]
     itemsByRestaurantByType(id: ID): [ItemByType]
     restrictionsByItem(id: ID): RestrictionByItem
+    restrictionTypes: [RestrictionType]
+    itemTypes: [ItemType]
   }
 
   extend type Mutation{
@@ -117,6 +127,34 @@ const resolvers = {
           });
         });
         return response;
+    },
+    itemTypes: async (parent, args) =>{
+	console.log(`Items Type`);
+	const session = driver.session();
+	let response = [];
+	const getData = await session.run(`
+	  match (i:itemType) return i
+	`,{}).then(async (result)=>{
+	   result.records.forEach((value,item)=>{
+		response.push(value._fields[0].properties);
+	   });
+	}).catch(error => console.log(`ERROR ${ERROR}`));
+	return response;
+    },
+    restrictionTypes: async (parent,args) =>{
+	console.log(`Restrictions Types`);
+	const session = driver.session();
+	let response = [];
+	const getData = await session.run(`
+	  match (r:restrictionType) return r
+	`,
+	{}).then(async (result)=>{
+	  await session.close();
+	  result.records.forEach((value,item)=>{
+	    response.push(value._fields[0].properties);
+	  });
+	}).catch(error => console.log(`Error ${error}`));
+	return response;
     },
     itemsByRestaurantByType: async (parent, args) => {
       console.log(`itemsByRestaurantByType: ${args.id}`);
