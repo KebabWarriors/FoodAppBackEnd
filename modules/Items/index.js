@@ -44,7 +44,7 @@ const typeDefs = `
 
   type RestrictionValueByItemData{
     id: ID
-    value: String
+    value:  ScalarBooleanOrStringOrInt
     price: Float
   }
 
@@ -68,16 +68,16 @@ const typeDefs = `
 
 
   input ValueByItemData{
-    value: String
+    value: ScalarBooleanOrStringOrInt
     price: Float
   }
 
   input StorageRestrictions{
     idRestrictionType: ID
-    nameResctriction: String
+    nameRestriction: String
     required: Boolean
     quantity: Int
-    valuesResctriction: [ValueByItemData]
+    values: [ValueByItemData]
   }
 
   extend type Query{
@@ -314,14 +314,14 @@ const resolvers = {
           merge (r)-[:HAS]->(i)
           with i,t,r
           unwind $option as rs
-          merge (i)-[:IS_TYPE]->(b:restriction{id: randomUUID(),name:rs.nameResctriction})
+          merge (i)-[:IS_TYPE]->(b:restriction{id: randomUUID(),name:rs.nameRestriction})
           with i,t,r,rs,b 
           match (d:restrictionType) where d.id = rs.idRestrictionType
           with i,t,r,rs,d,b
           merge (b)-[:IS_TYPE]->(d)
           with i,t,r,rs,d,b
-          unwind rs.valuesResctriction as campos
-          merge (c:restrictionValue{id:randomUUID(),value:campos})-[:belongs]->(b)
+          unwind rs.values as campos
+          merge (c:restrictionValue{id:randomUUID(),value:campos.value,price:campos.price})-[:belongs]->(b)
           return i,t,r,b,d
         `,
           {
