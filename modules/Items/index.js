@@ -115,6 +115,7 @@ const resolvers = {
           id: args.id
         }).then(async (result) =>{
           await session.close();
+	if(result.records.length > 0){
           result.records.forEach((value,item)=>{
             //we verify if we have the restaurant in our object
             response.push(
@@ -125,6 +126,7 @@ const resolvers = {
               }
             );
           });
+	}
         });
         return response;
     },

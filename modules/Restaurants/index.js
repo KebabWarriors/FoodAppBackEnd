@@ -17,11 +17,13 @@ const typeDefs = `
     owner: Person,
     address: String
     description: String
+    photo: String
   }
 
   extend type Query{
     restaurant(id: ID): Restaurant
     restaurantsByOwner(owner: String): [Restaurant]
+    restaurantByOwner(owner: String): Restaurant
     restaurants: [Restaurant]
     restaurantsWithoutType: [Restaurant]
     restaurantsByType(id: ID): [Restaurant] 
@@ -97,15 +99,35 @@ const resolvers = {
         return response;
 
     },
+    restaurantByOwner: async (parent,args)=>{
+	 const session = driver.session();
+      console.log(`restaurant: ${args}`);
+      let response = {};
+      let iteratorTool = null;
+      const getData = await session.run(
+        `match (r:restaurant),
+          (p:person)-[:owns]->(r) where p.id = $owner
+          return r,p`,
+          {
+        	owner: args.owner
+          }
+      ).then((result) => {
+	console.log(JSON.stringify(result.records[1]))
+	if(result.records.length > 0){
+		response = {...result.records[0]._fields[0].properties, owner: result.records[0]._fields[1].properties};
+	}
+      })
+	return response;
+    },
     restaurant: async (parent, args) => {
       const session = driver.session();
       console.log(`restaurant: ${args}`);
       let response = [];
       let iteratorTool = null;
       const getData = await session.run(
-        `match (r:restaurant)-[s:is_type]->(b),
+        `match (r:restaurant),
           (p:person)-[:owns]->(r) where r.id = $id
-          return r,s,b,p`,
+          return r,p`,
           {
             id: args.id
           }
@@ -237,6 +259,8 @@ const resolvers = {
 	{
 	  email: args.owner
 	}).then(async (result)=>{
+	 session.close();
+	 const session2 = driver.session();
 	 if(result.records.length === 0){
 	   //Send data to lambda to sign up in cognito
 	    const newUser = await fetch(`${process.env.COGNITO_CREATE_RESTAURANT_OWNER_URL}`,{
@@ -248,10 +272,10 @@ const resolvers = {
       	    }).catch(error => console.log(`ERROR ${error}`));  	 	 	
 	   
 	   //Starting our internal data	
-	   const setData = await session.run(`
+	   const setData = await session2.run(`
 	    create (r:restaurant{id: randomUUID(),name: $name})
 	    with r
-	    create (p:person{id:$id,email:$email})
+	    create (p:person{id:$id,email:$email,verified:false})
 	    with r,p
 	    merge (p)-[:owns]->(r) 
 	    return r
@@ -261,23 +285,26 @@ const resolvers = {
 		email: args.owner
 	  }).then((newResult)=>{
 	    response = newResult.records[0]._fields[0].properties;
-	  }).cath(error => console.log(`ERROR AT DATABASE ${error}`));
+	  }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
+
 	 }else{
+
 	   newOwner = result.records[0]._fields[0].properties.id;
 	    //Starting our internal data	
-	   const setData = await session.run(`
-	    match (r:restaurant{id: randomUUID(),name: $name})
+	   const setData = await session2.run(`
+	    create (r:restaurant{id: randomUUID(),name: $name})
 	    with r
 	    match (p:person) where p.id = $id
 	    with r,p
 	    merge (p)-[:owns]->(r) 
 	    return r
 	  `,{
-		  name: args.name,
-		  id: newOwner
-	   }).then((newResult)=>{
+		name: args.name,
+		id: newOwner
+	   }).then(async (newResult)=>{
+	    await session.close()
 	    response = newResult.records[0]._fields[0].properties;
-	   }).cath(error => console.log(`ERROR AT DATABASE ${error}`));
+	   }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
 	 }
 
 	}); 
@@ -306,7 +333,7 @@ const resolvers = {
       const getData = await session.run(
         ` match (p:person) where p.id = $owner 
           with p as pe 
-          match (r:restaurant) set name = $name, image = $photo,address = $address,description = $description where p.id = $id 
+          match (r:restaurant) where p.id = $id set r.name = $name, r.image = $photo,r.address = $address,r.description = $description 
           with pe,r
           match (rt:restaurantsType) where ${alias} 
           with collect(rt) as myList,pe,r

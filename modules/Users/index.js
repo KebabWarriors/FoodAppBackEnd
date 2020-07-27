@@ -22,6 +22,7 @@ const typeDefs = `
     dui: String
     address: String
     email: String
+    verified: Boolean
     phone: String
   }
 
@@ -49,8 +50,10 @@ const typeDefs = `
 
   extend type Query{
     person(id: ID): Person 
+    personByEmail(email: String): Person
     people: [Person]
     drivers: [Person]
+    verifyUser(email: String): Boolean
     login: Person
     cardsByUser(id: ID): [Cards]
     addressByUser(id: ID): [Address]
@@ -62,6 +65,7 @@ const typeDefs = `
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
     addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
     signPerson(person: NewUser): Person
+    confirmUser(email: String): Person
   }
  
 `;
@@ -73,8 +77,22 @@ const resolvers = {
       const session = driver.session();
       let response = {}
       const result =  await session.run(
-        'MATCH (p:person) where p.id = $id return p',
+        'match (p:person) where p.id = $id return p',
         {id: args.id}
+      ).then(async(result) =>{
+        await session.close();
+        if(result.records.length > 0)
+          response = {...result.records[0]._fields[0].properties}
+      });
+      return response;
+    },
+    personByEmail: async (parent,args,context,info) => {
+      console.log(`person: ${JSON.stringify(args)}`);
+      const session = driver.session();
+      let response = {}
+      const result =  await session.run(
+        'match (p:person) where p.email = $email return p',
+        {email: args.email}
       ).then(async(result) =>{
         await session.close();
         if(result.records.length > 0)
@@ -87,7 +105,7 @@ const resolvers = {
       const session = driver.session();
       let response = [];
       const result = await  session.run(
-          'MATCH (p:person) return p',
+          'match (p:person) return p',
           {}
         ).then(async (result) => {
           await session.close();
@@ -99,6 +117,21 @@ const resolvers = {
           console.log(`error ${error}`);
         });
         return response;
+    },
+    verifyUser: async (parent,args) => {
+	console.log(`Verify users`);
+	const session = driver.session();
+	let response = false;
+	const result = await session.run(`
+	  match (p:person) where p.email = $email and p.verified = true return p
+	`,{
+	  email: args.email
+	}).then(async (res)=>{
+	  if(res.records.length > 0){
+	  	response = true
+	  }
+	}).catch((error) => console.log(JSON.stringify(error)));
+	return response;
     },
     drivers: async (parent,args) => {
       console.log(`people: ${args}`);
@@ -358,8 +391,19 @@ const resolvers = {
         });
       }
         return response;  
-
-      
+    },
+    confirmUser: async (parent,args)=>{
+	console.log(`Confirm User`);
+	const session = driver.session();
+	let response = {};
+	const data = await session.run(`
+		match (p:person) where p.email = $email set p.verified = true return r
+	`,{
+	  email: args.email
+	}).then((result) => {
+	  response = result.records[0]._fields[0].properties
+	}).catch(error => console.log(`Error ${JSON.stringify(error)}`));
+	return response;
     }
   }
 };
