@@ -1,0 +1,41 @@
+service: FoodAppBackEnd
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  stage: dev
+  region: eu-west-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - lambda:InvokeFunction
+        - lambda:InvokeAsync
+      Resource: "*"
+
+plugins:
+  - serverless-offline
+
+functions:
+  graphql:
+    handler: index.graphqlHandler
+    events:
+      - http:
+          path: "{proxy+}"
+          method: any
+          cors: true
+  log:
+    handler: index.log
+    events:
+      - http:
+          path: "login"
+          method: get
+          integration: lambda
+          authorizer:
+            name: test
+            arn: arn:aws:cognito-idp:eu-west-2:576795205019:userpool/eu-west-2_qBdHSxvDF
+            claims:
+              - email
+  
+
+
+

@@ -1,0 +1,34 @@
+{
+  "name": "FoodAppBackEnd",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KebabWarriors/FoodAppBackEnd.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/KebabWarriors/FoodAppBackEnd/issues"
+  },
+  "homepage": "https://github.com/KebabWarriors/FoodAppBackEnd#readme",
+  "dependencies": {
+    "amazon-cognito-identity-js": "^4.3.2",
+    "apollo-server-lambda": "^2.14.1",
+    "aws-sdk": "^2.707.0",
+    "bcrypt": "^5.0.0",
+    "dotenv": "^8.2.0",
+    "graphql": "^15.0.0",
+    "neo4j-driver": "^4.0.2",
+    "neo4j-graphql-js": "^2.14.2",
+    "stripe": "^8.69.0"
+  },
+  "devDependencies": {
+    "serverless-offline": "^6.3.0"
+  }
+}
