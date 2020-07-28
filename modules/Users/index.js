@@ -397,7 +397,7 @@ const resolvers = {
 	const session = driver.session();
 	let response = {};
 	const data = await session.run(`
-		match (p:person) where p.email = $email set p.verified = true return r
+		match (p:person) where p.email = $email set p.verified = true return p
 	`,{
 	  email: args.email
 	}).then((result) => {

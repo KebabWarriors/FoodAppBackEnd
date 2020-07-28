@@ -1,10 +1,12 @@
+org: ficlel
+app: foodappbackend
 service: FoodAppBackEnd
 
 provider:
   name: aws
   runtime: nodejs12.x
   stage: dev
-  region: eu-west-1
+  region: us-west-1
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -23,19 +25,7 @@ functions:
           path: "{proxy+}"
           method: any
           cors: true
-  log:
-    handler: index.log
-    events:
-      - http:
-          path: "login"
-          method: get
-          integration: lambda
-          authorizer:
-            name: test
-            arn: arn:aws:cognito-idp:eu-west-2:576795205019:userpool/eu-west-2_qBdHSxvDF
-            claims:
-              - email
-  
+ 
 
 
 
