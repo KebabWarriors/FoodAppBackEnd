@@ -22,9 +22,19 @@ functions:
     handler: index.graphqlHandler
     events:
       - http:
-          path: "{proxy+}"
-          method: any
+          path: "/"
+          method: POST
           cors: true
+          response:
+            headers:
+              Access-Control-Allow-Origin: "'*'"
+      - http:
+          path: "/"
+          method: GET
+          cors: true
+          response:
+            headers:
+              Access-Control-Allow-Origin: "'*'"
  
 
 

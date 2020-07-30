@@ -1,4 +1,5 @@
 const { driver } = require('../../conf/connection.js');
+const fetch = require('cross-fetch');
 
 const typeDefs = `
 	

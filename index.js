@@ -15,7 +15,25 @@ const server = new ApolloServer({
     }),
 });
 
-exports.graphqlHandler = server.createHandler();
+const withCors = handler => (req, res, ...args) => {
+  if (req.method === 'OPTIONS')
+    // add required headers here
+    res.end()
+  else {
+    return handler(req, res, ...args)
+  }
+}
+
+
+
+exports.graphqlHandler = withCors(server.createHandler({
+  cors: {
+    origin: '*',
+    methods: ['POST', 'GET'],
+    allowedHeaders: ['Content-Type', 'Origin', 'Accept'],
+    credentials: true,
+  },
+}));
 
 
 

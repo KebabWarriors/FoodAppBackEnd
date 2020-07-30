@@ -4,6 +4,7 @@ const AmazonCognitoIdentity = require('amazon-cognito-identity-js');
 const dotenv = require("dotenv");
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_KEY);
+const fetch = require('cross-fetch');
 dotenv.config();
 
 
