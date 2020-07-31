@@ -25,6 +25,7 @@ const typeDefs = `
     email: String
     verified: Boolean
     phone: String
+    costumerId: String
   }
 
   type Address{
@@ -67,6 +68,7 @@ const typeDefs = `
     addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
     signPerson(person: NewUser): Person
     confirmUser(email: String): Person
+    addCardToPerson(id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String): Cards
   }
  
 `;
@@ -228,7 +230,7 @@ const resolvers = {
       
       	const session = driver.session();
         const result = await session.run(
-          'CREATE (a:person {id: $id,costumerID: $costumer, type: 5}) return a',
+          'CREATE (a:person {id: $id,costumerID: $costumer, type: 1}) return a',
           {
 	    id: args.id,
 	    costumer: myCostumer.id
@@ -405,6 +407,47 @@ const resolvers = {
 	  response = result.records[0]._fields[0].properties
 	}).catch(error => console.log(`Error ${JSON.stringify(error)}`));
 	return response;
+    },
+    addCardToPerson: async (parent,args)=>{
+	console.log(`Add Card To user`);
+	//id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String
+	let user = {};
+	const session = driver.session();
+	const getUserData = await session.run(`match (p:person) where p.id = $id return p`,{
+	  id: args.id
+	}).then((result)=>{
+	  if(result.records.length > 0)
+	  	user = result.records[0]._fields[0].properties;
+	}).catch(error => console.log(JSON.stringify(error)));
+	
+	try{
+	  const newCard = stripe.paymentMethods.create({
+		type: 'card',
+		card: {
+		  number:args.cardNumber,
+		  exp_month: args.expMonth,
+		  exp_year: args.expYear,
+		  cvc: args.cvc
+		},
+		billing_details:{
+		  name: args.name
+		}
+	  }, function(error, paymentMethod){
+		return paymentMethod;
+	  });
+	  console.log(JSON.stringify(newCard));
+	  return JSON.stringify(newCard);
+	 /* stripe.customers.createSource(
+	    args.id
+	  );*/
+	}
+	catch(error){
+	  console.log(error);
+	}
+	let response = {};
+	/*const data =  await session.run(`
+		
+	`);*/
     }
   }
 };

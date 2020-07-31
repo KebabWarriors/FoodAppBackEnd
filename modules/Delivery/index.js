@@ -9,6 +9,8 @@ const typeDefs = `
     information: String
     total: Float
     date: String
+    type: Int
+    card: Cards
   }
 
   type MultipleDelivery{
@@ -33,7 +35,7 @@ const typeDefs = `
     restrictionType: Int
     restrictionValue: [ScalarBooleanOrStringOrInt]
   }
-
+  # Input for a new delivery starts here
   input DeliveryItemDataRestrictions{
     restrictionId: ID
     restrictionType: Int
@@ -52,6 +54,8 @@ const typeDefs = `
     restaurant: ID
     address: ID
     items: [DeliveryItemData]
+    type: Int
+    card: String
   }
 
 
@@ -133,8 +137,20 @@ const resolvers = {
   Delivery:{
     addDelivery: async (parent, args,context,info) => {
       console.log("addDelivery");
+      //We declare an temp array to iterate the repeated values on our get
       let tempArray = [];
+      //We will use a validator in the loop for knowing where the value repeats
       let validator = null;
+      if(parseInt(args.type) === 1){
+	const sessionCard = driver.session();
+	const userCard = await sessionCard.run(`match (c:card) where c.id = $id`,{
+	  id: args.card
+	}).then(async function(result){
+	  sessionCard.close();
+	  return result.records[0]._fields[0].properties;
+	});
+      }
+      //To know which value repeats we use a function comparing to objects
       const restrictionsValidator = (forComparing, toComparing) =>{
         let isTheSame = true;
         if(forComparing.length > 0){
@@ -146,9 +162,9 @@ const resolvers = {
             }
           }
         }
-        
         return isTheSame;
       };
+      //then with the data we verify each value we got on the parameters 
       args.items.items.forEach((value,key) => {
         tempArray.filter((value2,key2)=>{
           if(value2.id === value.id && restrictionsValidator(value2.restrictions, value.restrictions)){
@@ -160,8 +176,7 @@ const resolvers = {
           }
          
         });
-       
-          
+      	  //If we have a repeated value on our object we incremenete de amount of the object  
           if(validator !== null){
             
             tempArray[validator.idChild].amount += 1;
@@ -180,7 +195,7 @@ const resolvers = {
         unwind $items as items
         match (i:item) where i.id = items.id
         with sum(i.price * items.amount) as price
-        create (d:delivery{id:randomUUID(),state:0,total:price,date:$date})
+        create (d:delivery{id:randomUUID(),state:0,total:price,date:$date,type:$type})
         with d
         match (p:person) where p.id = $id
         with d,p
@@ -209,7 +224,8 @@ const resolvers = {
           restaurant: args.items.restaurant,
           address: args.items.address,
           items: tempArray,
-          date: new Date().toISOString()
+          date: new Date().toISOString(),
+	  type: args.type
         }
       ).then(async (result) => {
         session.close();
@@ -224,6 +240,9 @@ const resolvers = {
       }).catch((error) => {
         console.log(`error in add delivery ${error}`);
       })
+      if(parseInt(args.type) === 1){
+	   	
+      }
       return response;
     }
   }
