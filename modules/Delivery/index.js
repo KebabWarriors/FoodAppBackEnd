@@ -35,6 +35,7 @@ const typeDefs = `
     restrictionType: Int
     restrictionValue: [ScalarBooleanOrStringOrInt]
   }
+
   # Input for a new delivery starts here
   input DeliveryItemDataRestrictions{
     restrictionId: ID

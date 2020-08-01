@@ -188,25 +188,32 @@ const resolvers = {
       console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       const token = context.headers.authorization.split(" ")[1];
       let userId = null;
-      const userToken = await fetch(`${process.env.COGNITO_TOKEN_VERIFICATION_URL}`,{
+      const userToken = await fetch(`${process.env.TOKEN_VERIFICATION_URL}`,{
 	method: 'POST',
         headers:{
-          "token": token
-      	}
-      }).then((response) => response.json()).then((result)=>{
+          "token": token,
+           'Content-Type': 'application/json'
+      	},
+	body:JSON.stringify({token:token})
+      }).then((response) => {
+	      console.log(`Error: ${JSON.stringify(response)}`); 
+	      return response.json(); 
+	}).then((result)=>{
+	
+	console.log(`result ${JSON.stringify(result)}`);
 	userId = result;
-	console.log(result);
+
       }).catch(error => console.log(`ERROR ${error}`));
-	console.log(userId);
+	console.log(`USERID ${JSON.stringify(userId)}`);
       const session = driver.session();
       let response = [];
       const result = await session.run(
-        `match (p:person)-[:HAS]->(a:address) where p.id = $id return a`,
+        `match (p:person)-[]->(a:address) where p.id = $id return a`,
         {id: userId}
       ).then(async (result) =>{
         await session.close();
         result.records.forEach((value,item)=>{
-	   console.log(`${value._fields[0].properties}`);
+	   console.log(`data: ${value._fields[0].properties}`);
           response.push({...value._fields[0].properties})
         });
       });
@@ -415,13 +422,15 @@ const resolvers = {
 	const session = driver.session();
 	const getUserData = await session.run(`match (p:person) where p.id = $id return p`,{
 	  id: args.id
-	}).then((result)=>{
+	}).then(async (result)=>{
+	  await session.close();
 	  if(result.records.length > 0)
 	  	user = result.records[0]._fields[0].properties;
 	}).catch(error => console.log(JSON.stringify(error)));
 	
 	try{
-	  const newCard = stripe.paymentMethods.create({
+	  // Creando nueva cartas
+	  const newCard = await stripe.paymentMethods.create({
 		type: 'card',
 		card: {
 		  number:args.cardNumber,
@@ -436,6 +445,26 @@ const resolvers = {
 		return paymentMethod;
 	  });
 	  console.log(JSON.stringify(newCard));
+	  //Starting to atach new card to costumer
+	  const addCardToCostumer = await stripe.paymentMethods.attach(
+		  newCard.id,
+	         {customer: user.customerId},
+		async function(error, paymentMethod){
+		  let tempSession = driver.session();
+		  await tempSession.run(`
+		    match (p:person) where p.id = $id
+		    with p
+		    create (c:card{id: randomUUID(),lastDigits:$lastDigits,token: $token, type: $type}) 
+		    with p,c
+		    create (p)-[:owns]->(c)-[:owner]->(p)
+		    return c
+		  `,{
+		    id: user.id,
+		    lastDigits: newCard.card.last4,
+	            toke: newCard.id,
+		   type: newCard.Card.brand
+		  }).then(()=>{})
+	  });
 	  return JSON.stringify(newCard);
 	 /* stripe.customers.createSource(
 	    args.id
