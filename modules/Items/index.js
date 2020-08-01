@@ -24,14 +24,15 @@ const typeDefs = `
   }
 
   type Restriction{
-    id: ID
+    id: String
     name: String
     required: Boolean
     type: RestrictionType
+    quantity: Int
   }
 
   type RestrictionValue{
-    id: ID
+    id: String
     value: String
     restriction: Restriction
   }
@@ -43,7 +44,7 @@ const typeDefs = `
   }
 
   type RestrictionValueByItemData{
-    id: ID
+    id: String
     value:  ScalarBooleanOrStringOrInt
     price: Float
   }
@@ -238,7 +239,7 @@ const resolvers = {
           restriction: []
         };
         result.records.forEach((value,item)=>{
-          console.log(value._fields[2])
+          //console.log(value._fields[2])
             //we verify if we have the restaurant in our object
             response.restriction.filter((value2,item2) => {
               if(value2.id === value._fields[1].properties.id){
@@ -269,11 +270,33 @@ const resolvers = {
             }
           });
       });
+      let newRestrictionsValues = [];
+      let mayorValue = 0;
+      response.restriction.forEach((value,item)=>{
+	//console.log(`PROBANDO FOR EACH ${JSON.stringify(value)}`) 
+	console.log(value.type.name)
+	if(parseInt(value.type.name) === 3){
+	  //console.log(JSON.stringify(value))
+	  value.values.forEach((value2,item2)=>{
+	     //console.log(`segundo for each ${JSON.stringify(value2.value)}`);
+	     if(parseInt(value2.value) > mayorValue){
+		mayorValue = parseInt(value2.value);
+	     }  
+	  });
+	  for(let i=1; i<=mayorValue;i++){
+	    console.log(`${value.id}-${i}`)
 
-      /*response.forEach((value,item)=>{
-
-      });*/
-
+	    newRestrictionsValues.push({
+		id: `${value.id}-${i}`,
+		value: i.toString()
+	    });
+	  }
+	  if(newRestrictionsValues.length > 0){	
+ 	    response.restriction[item].values = newRestrictionsValues;
+	  }
+	}
+      });
+      console.log(`HEY! ${JSON.stringify(response)}`);
       return response; 
     }
   },
