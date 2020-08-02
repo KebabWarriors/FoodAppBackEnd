@@ -334,20 +334,26 @@ const resolvers = {
     },
     updateAddress: async (parent, args) => {
       const session = driver.session();
-
+      
+      console.log(args.name)
       let payload;
-
+       const verifyIfNull = (toCompare,toReturn) =>{
+          if(toCompare !== undefined && toCompare !== null){
+            console.log("entramos a la condicion")
+            return `SET n.${toReturn} = COALESCE(n.${toReturn}, $${toReturn})`;
+          }
+         else{return ''}
+       };
       await session.run(
         `
         MATCH (n:address {id: $id})
         WITH n
-        SET n.name = COALESCE(n.name, $name)
-        SET n.streetAddress = COALESCE(n.streetAddress, $streetAddress)
-        SET n.build = COALESCE(n.build, $build)
-        SET n.door = COALESCE(n.door, $door)
-        SET n.latitude = COALESCE(n.latitude, $latitude)
-        SET n.longitude = COALESCE(n.longitude, $longitude)
-
+        ${verifyIfNull(args.name,'name')}
+        ${verifyIfNull(args.streetAddress,'streetAddress')}
+        ${verifyIfNull(args.build,'build')}
+        ${verifyIfNull(args.door,'door')}
+        ${verifyIfNull(args.latitud,'latitud')}
+        ${verifyIfNull(args.longitude,'longitude')}
         RETURN (n)
         `,
         {
