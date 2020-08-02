@@ -35,6 +35,7 @@ const typeDefs = `
     latitude: String
     longitude: String
     id: ID
+    name: String
   }
 
   type Cards{
@@ -65,7 +66,7 @@ const typeDefs = `
     addPerson(id:ID): Person
     addDriver(email: String!, name: String!, lastname: String!, dui: String!,address: String!, phone: String!): Person 
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
-    addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
+    addAddressToPerson(person: ID,address: String,build: String,door:String,name:String): Address 
     signPerson(person: NewUser): Person
     confirmUser(email: String): Person
     addCardToPerson(id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String): Cards
@@ -381,7 +382,7 @@ const resolvers = {
           });
       }else{
         const createNewAddress = await session.run(`
-          create (a:address{id:randomUUID(),latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address})
+          create (a:address{id:randomUUID(),latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address,name: $name})
           with a
           match (p:person) where p.id = $id
           with a,p
@@ -394,7 +395,8 @@ const resolvers = {
           build: args.build,
           door: args.door,
           id: args.person,
-          address: args.address
+          address: args.address,
+	  name: args.name
         }).then(async (result)=>{
           await session.close();
           response = result.records[0]._fields[0].properties;
