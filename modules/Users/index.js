@@ -71,6 +71,7 @@ const typeDefs = `
     signPerson(person: NewUser): Person
     confirmUser(email: String): Person
     addCardToPerson(id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String): Cards
+    deleteAddress(person:String,address:String): Boolean
   }
  
 `;
@@ -539,6 +540,18 @@ const resolvers = {
 	/*const data =  await session.run(`
 		
 	`);*/
+    },
+    deleteAddress: async (parent,args)=>{
+      const session = driver.session();
+      let response = false;  
+      const deleteData = await session.run(`match (p:person)-[s]->(a:address) where p.id = $person and a.id = $address delete s `,
+        {
+          person: args.person,
+          address: args.address
+        }).then((result)=>{
+          response = true;
+        });
+      return response;
     }
   }
 };
