@@ -66,7 +66,8 @@ const typeDefs = `
     addPerson(id:ID): Person
     addDriver(email: String!, name: String!, lastname: String!, dui: String!,address: String!, phone: String!): Person 
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
-    addAddressToPerson(person: ID,address: String,build: String,door:String,name:String): Address 
+    addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
+    updateAddress(id: ID!, streetAddress: String, build: String, door: String, latitude: String, logintude: String): Address
     signPerson(person: NewUser): Person
     confirmUser(email: String): Person
     addCardToPerson(id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String): Cards
@@ -197,7 +198,7 @@ const resolvers = {
       	},
 	body:JSON.stringify({token:token})
       }).then((response) => {
-	      console.log(`Error: ${JSON.stringify(response)}`); 
+	      console.log(`Data: ${JSON.stringify(response)}`); 
 	      return response.json(); 
 	}).then((result)=>{
 	
@@ -330,6 +331,45 @@ const resolvers = {
         console.log(`error: ${error}`);
       });
       return response;
+    },
+    updateAddress: async (parent, args) => {
+      const session = driver.session();
+
+      let payload;
+
+      await session.run(
+        `
+        MATCH (n:address {id: $id})
+        WITH n
+        SET n.name = COALESCE(n.name, $name)
+        SET n.streetAddress = COALESCE(n.streetAddress, $streetAddress)
+        SET n.build = COALESCE(n.build, $build)
+        SET n.door = COALESCE(n.door, $door)
+        SET n.latitude = COALESCE(n.latitude, $latitude)
+        SET n.longitude = COALESCE(n.longitude, $longitude)
+
+        RETURN (n)
+        `,
+        {
+          id: args.id,
+          name: args.name,
+          streetAddress: args.streetAddress,
+          build: args.build,
+          door: args.door,
+          latitude: args.latitude,
+          longitude: args.longitude
+        }
+      ).then((result) => {
+        if (result.records.length > 0)
+          payload = result.records[0]._fields[0].properties;
+      })
+      .catch((e) => {
+        payload = null;
+
+        console.log(e);
+      });
+
+      return payload;
     },
     addAddressToPerson: async (parent, args)=>{
       let newAddress;
