@@ -35,6 +35,7 @@ const typeDefs = `
     latitude: String
     longitude: String
     id: ID
+    name: String
   }
 
   type Cards{
@@ -333,20 +334,26 @@ const resolvers = {
     },
     updateAddress: async (parent, args) => {
       const session = driver.session();
-
+      
+      console.log(args.name)
       let payload;
-
+       const verifyIfNull = (toCompare,toReturn) =>{
+          if(toCompare !== undefined && toCompare !== null){
+            console.log("entramos a la condicion")
+            return `SET n.${toReturn} = COALESCE(n.${toReturn}, $${toReturn})`;
+          }
+         else{return ''}
+       };
       await session.run(
         `
         MATCH (n:address {id: $id})
         WITH n
-        SET n.name = COALESCE(n.name, $name)
-        SET n.streetAddress = COALESCE(n.streetAddress, $streetAddress)
-        SET n.build = COALESCE(n.build, $build)
-        SET n.door = COALESCE(n.door, $door)
-        SET n.latitude = COALESCE(n.latitude, $latitude)
-        SET n.longitude = COALESCE(n.longitude, $longitude)
-
+        ${verifyIfNull(args.name,'name')}
+        ${verifyIfNull(args.streetAddress,'streetAddress')}
+        ${verifyIfNull(args.build,'build')}
+        ${verifyIfNull(args.door,'door')}
+        ${verifyIfNull(args.latitud,'latitud')}
+        ${verifyIfNull(args.longitude,'longitude')}
         RETURN (n)
         `,
         {
@@ -421,7 +428,7 @@ const resolvers = {
           });
       }else{
         const createNewAddress = await session.run(`
-          create (a:address{id:randomUUID(),latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address})
+          create (a:address{id:randomUUID(),latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address,name: $name})
           with a
           match (p:person) where p.id = $id
           with a,p
@@ -434,7 +441,8 @@ const resolvers = {
           build: args.build,
           door: args.door,
           id: args.person,
-          address: args.address
+          address: args.address,
+	        name: args.name
         }).then(async (result)=>{
           await session.close();
           response = result.records[0]._fields[0].properties;
@@ -456,56 +464,63 @@ const resolvers = {
 	return response;
     },
     addCardToPerson: async (parent,args)=>{
-	console.log(`Add Card To user`);
-	//id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String
-	let user = {};
-	const session = driver.session();
-	const getUserData = await session.run(`match (p:person) where p.id = $id return p`,{
-	  id: args.id
-	}).then(async (result)=>{
-	  await session.close();
-	  if(result.records.length > 0)
-	  	user = result.records[0]._fields[0].properties;
-	}).catch(error => console.log(JSON.stringify(error)));
+	    console.log(`Add Card To user`);
+	    //id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String
+	    let user = {};
+      let card = {};
+      async function createUserOnDb(newCard){
+         let tempSession = driver.session();
+		        await tempSession.run(`
+		          match (p:person) where p.id = $id
+		          with p
+		          create (c:card{id: randomUUID(),lastDigits:$lastDigits,token: $token, type: $type}) 
+		          with p,c
+		          create (p)-[:owns]->(c)-[:owner]->(p)
+		          return c
+		        `,{
+		            id: user.id,
+		            lastDigits: newCard.last4,
+	              token: newCard.id,
+		            type: newCard.brand
+		          }).then(async(result)=>{
+                await tempSession.close();
+                if(result.records.length > 0){
+                  card = result.records[0]._fields[0].properties 
+                }
+              }); 
+      }  
+      const session = driver.session();
+	    const getUserData = await session.run(`match (p:person) where p.id = $id return p`,{
+	      id: args.id
+	    }).then(async (result)=>{
+	      await session.close();
+	      if(result.records.length > 0)
+	  	      user = result.records[0]._fields[0].properties;
+	    }).catch(error => console.log(JSON.stringify(error)));
 	
-	try{
-	  // Creando nueva cartas
-	  const newCard = await stripe.paymentMethods.create({
-		type: 'card',
-		card: {
-		  number:args.cardNumber,
-		  exp_month: args.expMonth,
-		  exp_year: args.expYear,
-		  cvc: args.cvc
-		},
-		billing_details:{
-		  name: args.name
-		}
-	  }, function(error, paymentMethod){
-		return paymentMethod;
-	  });
-	  console.log(JSON.stringify(newCard));
+	  try{
+	    // Creando nueva cartas
+      let tempCard;
+	    const newCard = await stripe.customers.createSource(
+        user.costumerId,
+        {
+		      source: {
+            object: 'card',
+		        number: args.cardNumber,
+		        exp_month: args.expMonth,
+		        exp_year: args.expYear,
+		        cvc: args.cvc,
+            name: args.name
+		      }
+        }
+	    ,  (error, paymentMethod)=>{
+        console.log(`method ${JSON.stringify(paymentMethod)}`)
+          createUserOnDb(paymentMethod); 
+	      });
+	    //console.log(JSON.stringify(newCard));
 	  //Starting to atach new card to costumer
-	  const addCardToCostumer = await stripe.paymentMethods.attach(
-		  newCard.id,
-	         {customer: user.customerId},
-		async function(error, paymentMethod){
-		  let tempSession = driver.session();
-		  await tempSession.run(`
-		    match (p:person) where p.id = $id
-		    with p
-		    create (c:card{id: randomUUID(),lastDigits:$lastDigits,token: $token, type: $type}) 
-		    with p,c
-		    create (p)-[:owns]->(c)-[:owner]->(p)
-		    return c
-		  `,{
-		    id: user.id,
-		    lastDigits: newCard.card.last4,
-	            toke: newCard.id,
-		   type: newCard.Card.brand
-		  }).then(()=>{})
-	  });
-	  return JSON.stringify(newCard);
+	 
+	  return card;
 	 /* stripe.customers.createSource(
 	    args.id
 	  );*/
@@ -513,7 +528,6 @@ const resolvers = {
 	catch(error){
 	  console.log(error);
 	}
-	let response = {};
 	/*const data =  await session.run(`
 		
 	`);*/
