@@ -479,17 +479,26 @@ const resolvers = {
 		          return c
 		        `,{
 		            id: user.id,
-		            lastDigits: newCard.last4,
+		            lastDigits: newCard.card.last4,
 	              token: newCard.id,
-		            type: newCard.brand
-		          }).then(async(result)=>{
-                await tempSession.close();
+		            type: newCard.card.brand
+		          }).then((result)=>{
+                console.log(`RESULTADO ${JSON.stringify(result)}`);
                 if(result.records.length > 0){
                   card = result.records[0]._fields[0].properties 
                 }
               }); 
       }  
-      const session = driver.session();
+      async function attachUserToCard(tempCard){
+        console.log(`CARD ON ATTAHC ${JSON.stringify(tempCard)}`);
+         const addCardToCostumer = await stripe.paymentMethods.attach(
+		        tempCard.id,
+	          {customer: user.customerId},
+		       (error, paymentMethod)=>{
+		          createUserOnDb(paymentMethod) 
+	        });
+      }
+	    const session = driver.session();
 	    const getUserData = await session.run(`match (p:person) where p.id = $id return p`,{
 	      id: args.id
 	    }).then(async (result)=>{
@@ -501,21 +510,20 @@ const resolvers = {
 	  try{
 	    // Creando nueva cartas
       let tempCard;
-	    const newCard = await stripe.customers.createSource(
-        user.costumerId,
-        {
-		      source: {
-            object: 'card',
-		        number: args.cardNumber,
-		        exp_month: args.expMonth,
-		        exp_year: args.expYear,
-		        cvc: args.cvc,
-            name: args.name
-		      }
-        }
-	    ,  (error, paymentMethod)=>{
+	    const newCard = await stripe.paymentMethods.create({
+		    type: 'card',
+		    card: {
+		      number:args.cardNumber,
+		      exp_month: args.expMonth,
+		      exp_year: args.expYear,
+		      cvc: args.cvc
+		    },
+		    billing_details:{
+		      name: args.name
+		    }
+	    },  (error, paymentMethod)=>{
         console.log(`method ${JSON.stringify(paymentMethod)}`)
-          createUserOnDb(paymentMethod); 
+          attachUserToCard(paymentMethod); 
 	      });
 	    //console.log(JSON.stringify(newCard));
 	  //Starting to atach new card to costumer
