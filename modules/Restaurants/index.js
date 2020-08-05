@@ -34,7 +34,7 @@ const typeDefs = `
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    addRestaurant(id:String,name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
+    editRestaurant(id:String,name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
   }
 `;
 
@@ -107,18 +107,18 @@ const resolvers = {
       let iteratorTool = null;
       const getData = await session.run(
         `match (r:restaurant),
-          (p:person)-[:owns]->(r) where p.id = $owner
+          (p:person)-[]->(r) where p.id = $owner
           return r,p`,
           {
         	owner: args.owner
           }
       ).then((result) => {
-	console.log(JSON.stringify(result.records[1]))
-	if(result.records.length > 0){
-		response = {...result.records[0]._fields[0].properties, owner: result.records[0]._fields[1].properties};
-	}
+	      console.log(JSON.stringify(result.records[1]))
+	      if(result.records.length > 0){
+		        response = {...result.records[0]._fields[0].properties, owner: result.records[0]._fields[1].properties};
+	      }
       })
-	return response;
+	    return response;
     },
     restaurant: async (parent, args) => {
       const session = driver.session();
@@ -127,7 +127,7 @@ const resolvers = {
       let iteratorTool = null;
       const getData = await session.run(
         `match (r:restaurant),
-          (p:person)-[:owns]->(r) where r.id = $id
+          (p:person)-[]->(r) where r.id = $id
           return r,p`,
           {
             id: args.id
@@ -157,8 +157,48 @@ const resolvers = {
             }
         });
       });
-      return response[0];
+      return response;
     }, 
+    restaurantsByOwner: async (parent,args) =>{
+      const session = driver.session();
+      console.log(`restaurant: ${args}`);
+      let response = [];
+      let iteratorTool = null;
+      const getData = await session.run(
+        `match (r:restaurant),
+          (p:person)-[]->(r) where p.id = $id
+          return r,p`,
+          {
+            id: args.owner
+          }
+      ).then((result) => {
+        result.records.forEach((value,item)=>{
+            //we verify if we have the restaurant in our object
+            response.filter((value2,item2) => {
+              if(value2.id === value._fields[0].properties.id){
+                //we storage it on an object
+                iteratorTool = {idParent: item, idChild: item2};
+              }
+            });
+          
+            response.push(
+                {
+                  ... value._fields[0].properties,
+                  owner:  value._fields[1].properties,
+                  //type:  [{...value._fields[2].properties}]
+                }
+              );
+            //Then we add it to the correct object in the array and delete the duplicate
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].type.push({...result.records[iteratorTool.idParent]._fields[1].properties});
+              response.splice(iteratorTool.idChild-1,1);
+              iteratorTool = null;
+            }
+        });
+      });
+      return response;
+
+    },
     restaurantsWithoutType: async (parent, args) => {
       console.log(`restaurants whitouttype: ${args}`);
       const session = driver.session();
@@ -249,22 +289,22 @@ const resolvers = {
       return response;
     },
     addRestaurantWithOwner: async (parent,args) =>{
-	console.log(`Add restaurant with owner`);
-	let newOwner;
-	let response = {};
-	const session = driver.session();
-	//Firts we verify if we have the user in our internal database
-	const verifyUserOnStore = await session.run(`
-	  match (p:person) where p.email = $email return p
-	`,
-	{
-	  email: args.owner
-	}).then(async (result)=>{
-	 session.close();
-	 const session2 = driver.session();
-	 if(result.records.length === 0){
-	   //Send data to lambda to sign up in cognito
-	    const newUser = await fetch(`${process.env.COGNITO_CREATE_RESTAURANT_OWNER_URL}`,{
+	    console.log(`Add restaurant with owner`);
+	    let newOwner;
+	    let response = {};
+	    const session = driver.session();
+	    //Firts we verify if we have the user in our internal database
+	    const verifyUserOnStore = await session.run(`
+	      match (p:person) where p.email = $email return p
+	    `,
+	    {
+	      email: args.owner
+	    }).then(async (result)=>{
+	    session.close();
+	    const session2 = driver.session();
+	    if(result.records.length === 0){
+	      //Send data to lambda to sign up in cognito
+	      const newUser = await fetch(`${process.env.COGNITO_CREATE_RESTAURANT_OWNER_URL}`,{
 	      method: 'POST',
               body: JSON.stringify({email: args.owner})
             }).then((response) => response.json()).then((result)=>{
@@ -281,12 +321,12 @@ const resolvers = {
 	    merge (p)-[:owns]->(r) 
 	    return r
 	  `,{
-		name: args.name,
-		id: newOwner,
-		email: args.owner
-	  }).then((newResult)=>{
-	    response = newResult.records[0]._fields[0].properties;
-	  }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
+		    name: args.name,
+		    id: newOwner,
+		    email: args.owner
+	    }).then((newResult)=>{
+	      response = newResult.records[0]._fields[0].properties;
+	    }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
 
 	 }else{
 
@@ -300,19 +340,19 @@ const resolvers = {
 	    merge (p)-[:owns]->(r) 
 	    return r
 	  `,{
-		name: args.name,
-		id: newOwner
-	   }).then(async (newResult)=>{
-	    await session.close()
-	    response = newResult.records[0]._fields[0].properties;
-	   }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
+		    name: args.name,
+		    id: newOwner
+	    }).then(async (newResult)=>{
+	      await session.close()
+	      response = newResult.records[0]._fields[0].properties;
+	    }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
 	 }
 
 	}); 
 	return response;	
     },
-    addRestaurant: async (parent, args) =>{
-      console.log(`addRestaurant: ${args}`);
+    editRestaurant: async (parent, args) =>{
+      console.log(`editRestaurant: ${args}`);
       const session = driver.session();
       let response = {};
       let params = {};

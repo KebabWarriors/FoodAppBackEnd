@@ -3,7 +3,7 @@ const { driver } = require('../../conf/connection.js');
 const typeDefs = `
   
   type Delivery{
-    id: ID 
+    id: ID
     user: Person
     state: Int
     information: String
@@ -14,7 +14,7 @@ const typeDefs = `
   }
 
   type MultipleDelivery{
-    id: ID 
+    id: ID
     user: Person
     state: Int
     information: String
@@ -37,10 +37,12 @@ const typeDefs = `
   }
 
   # Input for a new delivery starts here
+
+  #input value of restrictions array:
   input DeliveryItemDataRestrictions{
     restrictionId: ID
     restrictionType: Int
-    restrictionValue: [ScalarBooleanOrStringOrInt]
+    restrictionValue: String
   }
 
   input DeliveryItemData{
@@ -143,13 +145,13 @@ const resolvers = {
       //We will use a validator in the loop for knowing where the value repeats
       let validator = null;
       if(parseInt(args.type) === 1){
-	const sessionCard = driver.session();
-	const userCard = await sessionCard.run(`match (c:card) where c.id = $id`,{
-	  id: args.card
-	}).then(async function(result){
-	  sessionCard.close();
-	  return result.records[0]._fields[0].properties;
-	});
+	      const sessionCard = driver.session();
+	      const userCard = await sessionCard.run(`match (c:card) where c.id = $id`,{
+	        id: args.card
+	      }).then(async function(result){
+	        sessionCard.close();
+	        return result.records[0]._fields[0].properties;
+	      });
       }
       //To know which value repeats we use a function comparing to objects
       const restrictionsValidator = (forComparing, toComparing) =>{
@@ -165,7 +167,18 @@ const resolvers = {
         }
         return isTheSame;
       };
+
       //then with the data we verify each value we got on the parameters 
+      function getRealData(data){
+        let toReturn;
+        if(data.charAt(0) === "[" && data.charAt(data.length-1) === "]"){
+          toReturn = JSON.parse(data.replace(/'/g, '"'))
+        }else{
+          toReturn = data;
+        }
+        return toReturn;
+      }
+      let tempValue;
       args.items.items.forEach((value,key) => {
         tempArray.filter((value2,key2)=>{
           if(value2.id === value.id && restrictionsValidator(value2.restrictions, value.restrictions)){
@@ -178,13 +191,15 @@ const resolvers = {
          
         });
       	  //If we have a repeated value on our object we incremenete de amount of the object  
+          tempValue = value;
+          tempValue.restrictions.restrictionValue = getRealData(tempValue.restrictions.restrictionValue) ; 
           if(validator !== null){
             
             tempArray[validator.idChild].amount += 1;
             
             validator = null;
           }else{
-            tempArray.push({...value});
+            tempArray.push({...tempValue});
           }
 
       });
@@ -216,7 +231,7 @@ const resolvers = {
         merge (d)-[:HAS]->(di:deliveryItem{id:items.id,item:items.item,amount:items.amount})
         with d,p,items,res,a,di
         unwind items.restrictions as itemsRestrictions
-        merge (di)-[:Has]->(r:restricionDeliveryItemData{restrictionId:itemsRestrictions.restrictionId,restrictionType:itemsRestrictions.restrictionType,restrictionValue:itemsRestrictions.restrictionValue})
+        merge (di)-[:Has]->(r:restricionDeliveryItemData{restrictionValue:itemsRestrictions.restrictionValue})
         return d,p,di,r,res,a
       
         `,
@@ -226,7 +241,7 @@ const resolvers = {
           address: args.items.address,
           items: tempArray,
           date: new Date().toISOString(),
-	  type: args.type
+	        type: args.type
         }
       ).then(async (result) => {
         session.close();
