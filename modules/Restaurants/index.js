@@ -24,7 +24,7 @@ const typeDefs = `
   extend type Query{
     restaurant(id: ID): Restaurant
     restaurantsByOwner(owner: String): [Restaurant]
-    restaurantByOwner(owner: String): Restaurant
+    restaurantByOwner(owner: String,restaurant: String): Restaurant
     restaurants: [Restaurant]
     restaurantsWithoutType: [Restaurant]
     restaurantsByType(id: ID): [Restaurant] 
@@ -34,7 +34,8 @@ const typeDefs = `
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    editRestaurant(id:String,name: String, photo: String, type: [ID], owner: ID, address: String,description: String): Restaurant
+    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String): Restaurant
+    deleteRestaurant(id: String): Boolean
   }
 `;
 
@@ -107,10 +108,11 @@ const resolvers = {
       let iteratorTool = null;
       const getData = await session.run(
         `match (r:restaurant),
-          (p:person)-[]->(r) where p.id = $owner
+          (p:person)-[]->(r) where p.id = $owner and r.id = $restaurant
           return r,p`,
           {
-        	owner: args.owner
+        	  owner: args.owner,
+            restaurant: args.restaurant
           }
       ).then((result) => {
 	      console.log(JSON.stringify(result.records[1]))
@@ -352,7 +354,7 @@ const resolvers = {
 	return response;	
     },
     editRestaurant: async (parent, args) =>{
-      console.log(`editRestaurant: ${args}`);
+      console.log(`editRestaurant: ${JSON.stringify(args)}`);
       const session = driver.session();
       let response = {};
       let params = {};
@@ -374,7 +376,7 @@ const resolvers = {
       const getData = await session.run(
         ` match (p:person) where p.id = $owner 
           with p as pe 
-          match (r:restaurant) where p.id = $id set r.name = $name, r.image = $photo,r.address = $address,r.description = $description 
+          match (r:restaurant) where r.id = $id set r.name = $name, r.image = $photo,r.address = $address,r.description = $description 
           with pe,r
           match (rt:restaurantsType) where ${alias} 
           with collect(rt) as myList,pe,r
@@ -384,6 +386,7 @@ const resolvers = {
           merge (x)-[:is_in]->(r) 
           return r,x,pe`,
         {
+          id: args.restaurant,
           name: args.name, 
           photo: args.photo,
           address:args.address,
@@ -408,6 +411,9 @@ const resolvers = {
       });
       return response;
     }
+  },
+  deleteRestaurant: async (parent,args) =>{
+    
   }
 }
 

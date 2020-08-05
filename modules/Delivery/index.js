@@ -1,4 +1,9 @@
 const { driver } = require('../../conf/connection.js');
+const { verifyToken } = require('../Auth/index.js');
+const fetch = require('cross-fetch');
+const dotenv = require("dotenv");
+dotenv.config();
+
 
 const typeDefs = `
   
@@ -11,6 +16,8 @@ const typeDefs = `
     date: String
     type: Int
     card: Cards
+    restaurant: Restaurant
+    address: Address
   }
 
   type MultipleDelivery{
@@ -140,6 +147,14 @@ const resolvers = {
   Delivery:{
     addDelivery: async (parent, args,context,info) => {
       console.log("addDelivery");
+      const user = await verifyToken(context.headers.authorization);
+      if(user === null){
+        console.log("ERROR AUTH")
+        throw new AuthenticationError('must authenticate');
+      }
+      else{
+        console.log(`user: ${user}`)
+      }
       //We declare an temp array to iterate the repeated values on our get
       let tempArray = [];
       //We will use a validator in the loop for knowing where the value repeats
@@ -192,7 +207,10 @@ const resolvers = {
         });
       	  //If we have a repeated value on our object we incremenete de amount of the object  
           tempValue = value;
-          tempValue.restrictions.restrictionValue = getRealData(tempValue.restrictions.restrictionValue) ; 
+          console.log(JSON.stringify(tempValue.restrictions)) 
+          tempValue.restrictions.forEach((i,index)=>{
+              tempValue.restrictions[index].restrictionValue = getRealData(tempValue.restrictions[index].restrictionValue) 
+          });
           if(validator !== null){
             
             tempArray[validator.idChild].amount += 1;
@@ -203,7 +221,7 @@ const resolvers = {
           }
 
       });
-     
+       console.log(`Items ${JSON.stringify(tempArray)}`) 
       const session = driver.session();
       let response = {};
       const dataToUse = args.items.items;      
@@ -211,7 +229,7 @@ const resolvers = {
         unwind $items as items
         match (i:item) where i.id = items.id
         with sum(i.price * items.amount) as price
-        create (d:delivery{id:randomUUID(),state:0,total:price,date:$date,type:$type})
+        create (d:delivery{id:randomUUID(),state:0,total:(price+2.90),date:$date,type:$type})
         with d
         match (p:person) where p.id = $id
         with d,p
@@ -230,29 +248,63 @@ const resolvers = {
         unwind $items as items 
         merge (d)-[:HAS]->(di:deliveryItem{id:items.id,item:items.item,amount:items.amount})
         with d,p,items,res,a,di
+
         unwind items.restrictions as itemsRestrictions
-        merge (di)-[:Has]->(r:restricionDeliveryItemData{restrictionValue:itemsRestrictions.restrictionValue})
+        match (restriction:restriction) where restriction.id = itemsRestrictions.restrictionId
+        with d,p,items,res,a,di, itemsRestrictions,restriction
+
+        merge (di)-[:HAS]->(r:restricionDeliveryItemData{id:randomUUID(), restriction:restriction.id})
+        with d,p,items,res,a,di, itemsRestrictions,r,restriction
+
+        unwind itemsRestrictions.restrictionValue as values
+        match(restrictionValue:restrictionValue) where restrictionValue.id = values
+        with d,p,items,res,a,di, itemsRestrictions,r,restriction,values,restrictionValue
+
+        merge (r)-[:HAS]->(rv:restrictionDeliveryItemDataRestrictions{id:restrictionValue.id,value:restrictionValue.value}) 
+        with d,p,items,res,a,di, itemsRestrictions,r,restriction,values,restrictionValue
+
         return d,p,di,r,res,a
       
         `,
         {
-          id:args.items.user,
+          id:user,
           restaurant: args.items.restaurant,
           address: args.items.address,
           items: tempArray,
           date: new Date().toISOString(),
-	        type: args.type
+	        type: args.items.type
         }
       ).then(async (result) => {
         session.close();
+        console.log(`data: ${JSON.stringify(result)}`)
         response = {
-          ... result.records[0]._fields[0].properties,
+            ... result.records[0]._fields[0].properties,
           user: {
             ... result.records[0]._fields[1].properties
+          },
+          address:{
+            ... result.records[0]._fields[5].properties
+          },
+          restaurant:{
+            ... result.records[0]._fields[4].properties
           }
         }
         console.log(result.records[0]._fields[0])
-        
+        const createDeliveryFirebase = await fecth(process.env.URL_CREATE_DELIVERY,{
+        method: 'POST',
+        headers:{
+          "Authorization": `Bearer ${context.headers.authorization}`,
+          'Content-Type': 'application/json'
+      	},
+        body:JSON.stringify({
+            deliveryid: response.id,
+            client:response.user.id,
+            destination: {lat:response.address.latitude,lng:response.address.longitude},
+            restaurant: response.restaurant.id 
+          })
+        }).then((responseData=>responseData.json).then((finalResult)=>{
+          console.log(finalResult)
+        }) 
       }).catch((error) => {
         console.log(`error in add delivery ${error}`);
       })

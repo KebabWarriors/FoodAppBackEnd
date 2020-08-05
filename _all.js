@@ -3,7 +3,7 @@ const { typeDefs: restaurantsSchema, resolvers: restaurantsResolver } = require(
 const { typeDefs: itemsSchema, resolvers: itemsResolver } = require('./modules/Items');
 const { typeDefs: deliverySchema, resolvers: deliveryResolver } = require('./modules/Delivery');
 const { myScalars, myScalarsNames} = require('./modules/PersonalizedScalars');
-const { gql } = require('apollo-server-lambda');
+const { gql, AuthenticationError } = require('apollo-server-lambda');
 
 
 const typeDefs = gql`

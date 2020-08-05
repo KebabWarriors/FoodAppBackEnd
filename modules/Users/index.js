@@ -125,19 +125,19 @@ const resolvers = {
         return response;
     },
     verifyUser: async (parent,args) => {
-	console.log(`Verify users`);
-	const session = driver.session();
-	let response = false;
-	const result = await session.run(`
-	  match (p:person) where p.email = $email and p.verified = true return p
-	`,{
-	  email: args.email
-	}).then(async (res)=>{
-	  if(res.records.length > 0){
-	  	response = true
-	  }
-	}).catch((error) => console.log(JSON.stringify(error)));
-	return response;
+	    console.log(`Verify users`);
+	    const session = driver.session();
+  	  let response = false;
+	    const result = await session.run(`
+	      match (p:person) where p.email = $email and p.verified = true return p
+	    `,{
+	        email: args.email
+	      }).then(async (res)=>{
+	        if(res.records.length > 0){
+	  	      response = true
+	        }
+	      }).catch((error) => console.log(JSON.stringify(error)));
+	      return response;
     },
     drivers: async (parent,args) => {
       console.log(`people: ${args}`);
@@ -164,14 +164,14 @@ const resolvers = {
       //console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       const token = context.headers.authorization.split(" ")[1];
       let userId = null;
-      const userToken = await fetch(`${process.env.COGNITO_TOKEN_VERIFICATION_URL}`,{
-	method: 'POST',
+      const userToken = await fetch(`${process.env.TOKEN_VERIFICATION_URL}`,{
+      	method: 'POST',
         headers:{
           "token": token
       	}
       }).then((response) => response.json()).then((result)=>{
-	userId = result;
-	//console.log(result);
+	        userId = result;
+	        //console.log(result);
       }).catch(error => console.log(`ERROR ${error}`));
       const session = driver.session();
       let response = [];
