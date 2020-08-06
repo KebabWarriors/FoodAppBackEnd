@@ -290,7 +290,7 @@ const resolvers = {
           }
         }
         console.log(result.records[0]._fields[0])
-        const createDeliveryFirebase = await fecth(process.env.URL_CREATE_DELIVERY,{
+        const createDeliveryFirebase = await fetch(process.env.URL_CREATE_DELIVERY,{
         method: 'POST',
         headers:{
           "Authorization": `Bearer ${context.headers.authorization}`,
@@ -302,7 +302,7 @@ const resolvers = {
             destination: {lat:response.address.latitude,lng:response.address.longitude},
             restaurant: response.restaurant.id 
           })
-        }).then((responseData=>responseData.json).then((finalResult)=>{
+        }).then((responseData)=>responseData.json).then((finalResult)=>{
           console.log(finalResult)
         }) 
       }).catch((error) => {
