@@ -255,18 +255,20 @@ const resolvers = {
               }
             });
           
-            response.push(
+                        //Then we add it to the correct object in the array and delete the duplicate
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].type.push({...result.records[iteratorTool.idParent]._fields[2].properties});
+              //response.splice(iteratorTool.idChild-1,1);
+              iteratorTool = null;
+            }else{
+             response.push(
                 {
                   ... value._fields[0].properties,
                   owner:  value._fields[3].properties,
                   type:  [{...value._fields[2].properties}]
                 }
               );
-            //Then we add it to the correct object in the array and delete the duplicate
-            if(iteratorTool !== null){
-              response[iteratorTool.idChild].type.push({...result.records[iteratorTool.idParent]._fields[2].properties});
-              response.splice(iteratorTool.idChild-1,1);
-              iteratorTool = null;
+ 
             }
             
           });

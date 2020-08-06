@@ -148,11 +148,79 @@ const resolvers = {
     addDelivery: async (parent, args,context,info) => {
       console.log("addDelivery");
       const user = await verifyToken(context.headers.authorization);
+      const hashToken = (string) =>{
+        let hash = 0;
+        if (string.length === 0)
+          return hash;
+        for (let i = 0; i < string.length; i++) {
+          let charCode = string.charCodeAt(i);
+          hash = ((hash << 7) - hash) + charCode;
+          hash = hash & hash;
+        }
+        return hash.toString().replace('-',makeid(1));
+      }
+
+      const makeid = (length) => {
+        let result = '';
+        const characters = 'ABCDEFGHIJKLMOPQRSTUVWXYZ';
+        const charactersLength = 28;
+        for (let i = 0; i < length; i++ ) {
+          result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+        return result;
+      }
+
+            //getUUID
+      let session = driver.session();
+       const myUUID = await session.run(`return randomUUID()`,{
+         }).then(async (result)=>{
+           console.log(`UUID ${JSON.stringify(result.records)}`)
+            await session.close();
+            return result.records[0]._fields[0];
+         });
+        
+        //My hash to reference
+        const myHash = hashToken(`${myUUID} ${new Date().toISOString()}`); 
+      
+
       if(user === null){
         console.log("ERROR AUTH")
         throw new AuthenticationError('must authenticate');
       }
       else{
+        //First at all we create our firestore delivery
+        //step number 1, we create our UUID
+        console.log(`UUID ${myUUID}`)
+        //step 2, we get the address 
+         session = driver.session();
+
+          const myNewAddress = await session.run(`
+              match (a:address) where a.id = $id return a
+            `,{
+                id: args.items.address
+            }).then(async (result)=>{
+              await session.close();
+              console.log(JSON.stringify(result))
+              return result.records[0]._fields[0].properties
+            });
+        console.log(`direccion ${JSON.stringify(myNewAddress)}`);
+        //step 3, we create on firebase our delivery 
+        const createDeliveryFirebase = await fetch(process.env.URL_CREATE_DELIVERY,{
+        method: 'POST',
+        headers:{
+          "Authorization": `Bearer ${context.headers.authorization}`,
+          'Content-Type': 'application/json'
+      	},
+        body:JSON.stringify({
+            deliveryid: myUUID,
+            client: user,
+            destination: {lat:myNewAddress.latitude,lng:myNewAddress.longitude},
+            restaurant: args.items.restaurant,
+            reference: myHash
+          })
+        }).then((responseData)=>responseData.json).then((finalResult)=>{
+          console.log(finalResult)
+        }) 
         console.log(`user: ${user}`)
       }
       //We declare an temp array to iterate the repeated values on our get
@@ -161,7 +229,7 @@ const resolvers = {
       let validator = null;
       if(parseInt(args.type) === 1){
 	      const sessionCard = driver.session();
-	      const userCard = await sessionCard.run(`match (c:card) where c.id = $id`,{
+	      const userCard = await sessionCard.run(`match (c:card) where c.id = $id return c`,{
 	        id: args.card
 	      }).then(async function(result){
 	        sessionCard.close();
@@ -222,14 +290,15 @@ const resolvers = {
 
       });
        console.log(`Items ${JSON.stringify(tempArray)}`) 
-      const session = driver.session();
       let response = {};
-      const dataToUse = args.items.items;      
-      const setData = await session.run(`
+      const dataToUse = args.items.items;
+       session = driver.session();
+
+      const setData = session.run(`
         unwind $items as items
         match (i:item) where i.id = items.id
         with sum(i.price * items.amount) as price
-        create (d:delivery{id:randomUUID(),state:0,total:(price+2.90),date:$date,type:$type})
+        create (d:delivery{id:$delivery,state:0,total:(price+2.90),date:$date,type:$type,reference:$reference})
         with d
         match (p:person) where p.id = $id
         with d,p
@@ -268,11 +337,13 @@ const resolvers = {
         `,
         {
           id:user,
+          delivery: myUUID,
           restaurant: args.items.restaurant,
           address: args.items.address,
           items: tempArray,
           date: new Date().toISOString(),
-	        type: args.items.type
+	        type: args.items.type,
+          reference: myHash
         }
       ).then(async (result) => {
         session.close();
@@ -290,28 +361,14 @@ const resolvers = {
           }
         }
         console.log(result.records[0]._fields[0])
-        const createDeliveryFirebase = await fetch(process.env.URL_CREATE_DELIVERY,{
-        method: 'POST',
-        headers:{
-          "Authorization": `Bearer ${context.headers.authorization}`,
-          'Content-Type': 'application/json'
-      	},
-        body:JSON.stringify({
-            deliveryid: response.id,
-            client:response.user.id,
-            destination: {lat:response.address.latitude,lng:response.address.longitude},
-            restaurant: response.restaurant.id 
-          })
-        }).then((responseData)=>responseData.json).then((finalResult)=>{
-          console.log(finalResult)
-        }) 
+        
       }).catch((error) => {
         console.log(`error in add delivery ${error}`);
       })
       if(parseInt(args.type) === 1){
 	   	
       }
-      return response;
+      return {id: myUUID};
     }
   }
 }
