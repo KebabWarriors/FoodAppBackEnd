@@ -412,10 +412,20 @@ const resolvers = {
         console.log(result.records[1]._fields);*/
       });
       return response;
-    }
-  },
-  deleteRestaurant: async (parent,args) =>{
-    
+    },
+    deleteRestaurant: async (parent,args) =>{
+      console.log(`delete restaurant`);
+      console.log(args.id)
+      const session = driver.session();
+      let response = false;
+      const deleteRestaurant = await session.run(`match (r:restaurant) where r.id = $id detach delete r `,{
+        id: args.id
+      }).then(async (result)=>{
+        await session.close();
+          response = true;
+      });
+    return response;
+  }
   }
 }
 
