@@ -72,7 +72,8 @@ const typeDefs = `
     confirmUser(email: String): Person
     addCardToPerson(id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String): Cards
     deleteAddress(person:String,address:String): Boolean
-  }
+    setDriverOnline(id:String,location:[Float]): String
+ }
  
 `;
 
@@ -157,7 +158,6 @@ const resolvers = {
         });
         return response;
     },
-
     cardsByUser: async (parent, args,context,info) => {
       console.log(`cards`);
       console.log(JSON.stringify(args));
@@ -188,26 +188,30 @@ const resolvers = {
     },
     addressByUser: async (parent, args,context,info) => {
       console.log(`address`);
-      console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
-      const token = context.headers.authorization.split(" ")[1];
+      console.log(`HEADERS ${JSON.stringify(context.headers)}`)
+      console.log(`token ${JSON.stringify(context.headers.Authorization.split(" ")[1])}`);
+      let token;
+      if(context.headers.Authorization){
+      token = context.headers.Authorization.split(" ")[1];
+      }else{
+       token = context.headers.authorization.split(" ")[1]; 
+      }
       let userId = null;
       const userToken = await fetch(`${process.env.TOKEN_VERIFICATION_URL}`,{
-	method: 'POST',
+	      method: 'POST',
         headers:{
           "token": token,
            'Content-Type': 'application/json'
       	},
-	body:JSON.stringify({token:token})
+	        body:JSON.stringify({token:token})
       }).then((response) => {
 	      console.log(`Data: ${JSON.stringify(response)}`); 
 	      return response.json(); 
-	}).then((result)=>{
-	
-	console.log(`result ${JSON.stringify(result)}`);
-	userId = result;
-
+	    }).then((result)=>{
+	        console.log(`result ${JSON.stringify(result)}`);
+	        userId = result;
       }).catch(error => console.log(`ERROR ${error}`));
-	console.log(`USERID ${JSON.stringify(userId)}`);
+	    console.log(`USERID ${JSON.stringify(userId)}`);
       const session = driver.session();
       let response = [];
       const result = await session.run(
@@ -216,7 +220,7 @@ const resolvers = {
       ).then(async (result) =>{
         await session.close();
         result.records.forEach((value,item)=>{
-	   console.log(`data: ${value._fields[0].properties}`);
+	        console.log(`data: ${value._fields[0].properties}`);
           response.push({...value._fields[0].properties})
         });
       });
@@ -229,23 +233,23 @@ const resolvers = {
       let person = {};
       let myCostumer  = {}
      	stripe.costumers.create({
-		name: args.id
+		    name: args.id
      	}, (error, costumer) =>
-	{
-	  if(error){
-		console.log(`ERROR! ${error}`);
-	  }
-		myCostumer = costumer;
+	    {
+	      if(error){
+		      console.log(`ERROR! ${error}`);
+	      }
+		    myCostumer = costumer;
      	}); 
       
       	const session = driver.session();
         const result = await session.run(
           'CREATE (a:person {id: $id,costumerID: $costumer, type: 1}) return a',
           {
-	    id: args.id,
-	    costumer: myCostumer.id
-	  }
-        ).then(async (result) => {
+	          id: args.id,
+	          costumer: myCostumer.id
+	        }
+          ).then(async (result) => {
           await session.close();
           //console.log(result.records[0]._fields[0].properties);
           person = result.records[0]._fields[0].properties;
@@ -255,44 +259,44 @@ const resolvers = {
         return person;
     },
     addDriver: async (parent,args,context,info) => {
-	console.log('addDrvier');
-	//console.log(JSON.stringify(args));
-	let userId = "";
-	let person = {};
-	const newUser = await fetch(`${process.env.COGNITO_CREATE_DRIVER_URL}`,{
-	  method: 'POST',
-          body: JSON.stringify({email: args.email})
+	    console.log('addDrvier');
+	    //console.log(JSON.stringify(args));
+	    let userId = "";
+	    let person = {};
+	    const newUser = await fetch(`${process.env.CREATE_DRIVER_URL}`,{
+	        method: 'POST',
+          body: JSON.stringify({email: args.email,name:args.name})
          }).then((response) => response.json()).then((result)=>{
-	   userId = result;
-	   console.log(result);
+	        userId = result.uid;
+	        console.log(result);
       	}).catch(error => console.log(`ERROR ${error}`));
-	const session = driver.session();
-	const result = await session.run(`CREATE (p:person {
-		id: $id,
-		email: $email,
-		type: 2,
-		name: $name, 
-		lastname: $lastname, 
-		dui: $dui, 
-		address: $address, 
-		phone: $phone
-	  }) return p`,
-	  {
-	    id: userId.userSub,
-	    email: args.email,
-	    name: args.name,
-	    lastname: args.lastname,
-	    dui: args.dui,
-	    address: args.address,
-	    phone: args.phone
-	  }).then(async (result) => {
+	      const session = driver.session();
+	      const result = await session.run(`CREATE (p:person {
+		      id: $id,
+		      email: $email,
+		      type: 2,
+		      name: $name, 
+		      lastname: $lastname, 
+		      dui: $dui, 
+		      address: $address, 
+		      phone: $phone
+	      }) return p`,
+	      {
+	        id: userId.userSub,
+	        email: args.email,
+	        name: args.name,
+	        lastname: args.lastname,
+	        dui: args.dui,
+	        address: args.address,
+	        phone: args.phone
+	      }).then(async (result) => {
           await session.close();
           //console.log(result.records[0]._fields[0].properties);
           person = result.records[0]._fields[0].properties;
         }).catch((error) =>{
           return  {id: 0,name: "error", email: "error",password: "error",phone: "error"}
         });	
-	return person;
+	    return person;
     },
     updatePerson: async (parent, args) => {
       console.log(`updatePerson: ${args}`);
@@ -452,17 +456,17 @@ const resolvers = {
         return response;  
     },
     confirmUser: async (parent,args)=>{
-	console.log(`Confirm User`);
-	const session = driver.session();
-	let response = {};
-	const data = await session.run(`
-		match (p:person) where p.email = $email set p.verified = true return p
-	`,{
-	  email: args.email
-	}).then((result) => {
-	  response = result.records[0]._fields[0].properties
-	}).catch(error => console.log(`Error ${JSON.stringify(error)}`));
-	return response;
+	  console.log(`Confirm User`);
+	  const session = driver.session();
+	  let response = {};
+	  const data = await session.run(`
+		  match (p:person) where p.email = $email set p.verified = true return p
+	  `,{
+	    email: args.email
+	  }).then((result) => {
+	    response = result.records[0]._fields[0].properties
+	  }).catch(error => console.log(`Error ${JSON.stringify(error)}`));
+	    return response;
     },
     addCardToPerson: async (parent,args)=>{
 	    console.log(`Add Card To user`);
@@ -550,6 +554,19 @@ const resolvers = {
           address: args.address
         }).then((result)=>{
           response = true;
+        });
+      return response;
+    },
+    setDriverOnline: async (parent,args)=>{
+      let response = {};
+        const setDriver =  await fecth(process.env.CREATE_DRIVER_JOB,{
+          method: 'GET',
+          headers:{
+            "ContentType": "application/json"
+          },
+          body: JSON.stringify({id:args.id,location:args.location})
+        }).then((result)=>{
+           response.id = result.uid 
         });
       return response;
     }

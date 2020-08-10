@@ -147,7 +147,7 @@ const resolvers = {
   Delivery:{
     addDelivery: async (parent, args,context,info) => {
       console.log("addDelivery");
-      const user = await verifyToken(context.headers.authorization);
+      const user = await verifyToken(context.headers.Authorization);
       const hashToken = (string) =>{
         let hash = 0;
         if (string.length === 0)

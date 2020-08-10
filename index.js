@@ -30,7 +30,7 @@ exports.graphqlHandler = withCors(server.createHandler({
   cors: {
     origin: '*',
     methods: ['POST', 'GET'],
-    allowedHeaders: ['Content-Type', 'Origin', 'Accept'],
+    allowedHeaders: ['Content-Type', 'Origin', 'Accept',"token","authorization","Authorization"],
     credentials: true,
   },
 }));

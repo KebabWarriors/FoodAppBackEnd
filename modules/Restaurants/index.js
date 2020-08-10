@@ -43,17 +43,17 @@ const resolvers = {
   Query:{
     restaurantsType: async (parent, args) => {
       console.log(`restaurantsType: ${args}`);
-	const session = driver.session();
-	let response = [];
-	const getData = await session.run(
-	'MATCH (r:restaurantsType) return r',
-	{}
-	).then(async (result) => {
-	  await session.close();
-	  result.records.forEach((value, key) => {
-	    response.push({...value._fields[0].properties})
-	  });
-	});
+	    const session = driver.session();
+	    let response = [];
+	    const getData = await session.run(
+	      'MATCH (r:restaurantsType) return r',
+	    {}
+	    ).then(async (result) => {
+	      await session.close();
+	      result.records.forEach((value, key) => {
+	        response.push({...value._fields[0].properties})
+	      });
+	    });
      return response;
     },
     restaurantsByType: async (parent, args) => {
@@ -99,10 +99,9 @@ const resolvers = {
           
         });
         return response;
-
     },
     restaurantByOwner: async (parent,args)=>{
-	 const session = driver.session();
+	    const session = driver.session();
       console.log(`restaurant: ${args}`);
       let response = {};
       let iteratorTool = null;
@@ -304,56 +303,62 @@ const resolvers = {
 	    {
 	      email: args.owner
 	    }).then(async (result)=>{
-	    session.close();
-	    const session2 = driver.session();
-	    if(result.records.length === 0){
-	      //Send data to lambda to sign up in cognito
-	      const newUser = await fetch(`${process.env.COGNITO_CREATE_RESTAURANT_OWNER_URL}`,{
-	      method: 'POST',
-              body: JSON.stringify({email: args.owner})
+	      await session.close();
+	      const session2 = driver.session();
+	      if(result.records.length === 0){
+	        //Send data to lambda to sign up in cognito
+          const tempSession = driver.session();
+          const newUID = await tempSession.run(`return randomUUID()`,{}).then(async (result)=>{
+            await tempSession.close();
+            newOwner = result.records[0]._fields[0];
+            console.log(newOwner)
+            return result.records[0]._fields[0];
+          }); 
+	        const newUser = await fetch(`${process.env.CREATE_RESTAURANT_OWNER_URL}`,{
+	            method: 'POST',
+               headers:{
+                'Content-Type': 'application/json'
+      	      },
+              body: JSON.stringify({email: args.owner,uid: newUID})
             }).then((response) => response.json()).then((result)=>{
-	      newOwner = result.userSub;
-	      console.log(result);
       	    }).catch(error => console.log(`ERROR ${error}`));  	 	 	
 	   
-	   //Starting our internal data	
+	        //Starting our internal data	
+	        const setData = await session2.run(`
+	          create (r:restaurant{id: randomUUID(),name: $name})
+	          with r
+	          create (p:person{id:$id,email:$email,verified:false})
+	          with r,p
+	          merge (p)-[:owns]->(r) 
+	          return r
+	        `,{
+		          name: args.name,
+		          id: newOwner,
+		          email: args.owner
+	          }).then((newResult)=>{
+	            response = newResult.records[0]._fields[0].properties;
+	          }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
+	    }else{
+
+	      newOwner = result.records[0]._fields[0].properties.id;
+	      //Starting our internal data	
 	   const setData = await session2.run(`
-	    create (r:restaurant{id: randomUUID(),name: $name})
-	    with r
-	    create (p:person{id:$id,email:$email,verified:false})
-	    with r,p
-	    merge (p)-[:owns]->(r) 
-	    return r
-	  `,{
-		    name: args.name,
-		    id: newOwner,
-		    email: args.owner
-	    }).then((newResult)=>{
-	      response = newResult.records[0]._fields[0].properties;
-	    }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
-
-	 }else{
-
-	   newOwner = result.records[0]._fields[0].properties.id;
-	    //Starting our internal data	
-	   const setData = await session2.run(`
-	    create (r:restaurant{id: randomUUID(),name: $name})
-	    with r
-	    match (p:person) where p.id = $id
-	    with r,p
-	    merge (p)-[:owns]->(r) 
-	    return r
-	  `,{
-		    name: args.name,
-		    id: newOwner
-	    }).then(async (newResult)=>{
-	      await session.close()
-	      response = newResult.records[0]._fields[0].properties;
-	    }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
-	 }
-
-	}); 
-	return response;	
+	      create (r:restaurant{id: randomUUID(),name: $name})
+	      with r
+	      match (p:person) where p.id = $id
+	      with r,p
+	      merge (p)-[:owns]->(r) 
+	      return r
+	    `,{
+		        name: args.name,
+		        id: newOwner
+	        }).then(async (newResult)=>{
+	          await session.close()
+	          response = newResult.records[0]._fields[0].properties;
+	        }).catch(error => console.log(`ERROR AT DATABASE ${error}`));
+	      }
+  	  }); 
+	    return response;	
     },
     editRestaurant: async (parent, args) =>{
       console.log(`editRestaurant: ${JSON.stringify(args)}`);
