@@ -189,12 +189,13 @@ const resolvers = {
     addressByUser: async (parent, args,context,info) => {
       console.log(`address`);
       console.log(`HEADERS ${JSON.stringify(context.headers)}`)
-      console.log(`token ${JSON.stringify(context.headers.Authorization.split(" ")[1])}`);
       let token;
-      if(context.headers.Authorization){
+      if(context.headers.Authorization !== undefined){
+      console.log(`token ${JSON.stringify(context.headers.Authorization.split(" ")[1])}`);
       token = context.headers.Authorization.split(" ")[1];
       }else{
        token = context.headers.authorization.split(" ")[1]; 
+       console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       }
       let userId = null;
       const userToken = await fetch(`${process.env.TOKEN_VERIFICATION_URL}`,{

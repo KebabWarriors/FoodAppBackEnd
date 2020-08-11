@@ -147,7 +147,18 @@ const resolvers = {
   Delivery:{
     addDelivery: async (parent, args,context,info) => {
       console.log("addDelivery");
-      const user = await verifyToken(context.headers.Authorization);
+      let token;
+      //Verify if auth cames with lowercase or upper case
+      if(context.headers.Authorization !== undefined){
+        console.log(`token ${JSON.stringify(context.headers.Authorization.split(" ")[1])}`);
+        token = context.headers.Authorization;
+      }else{
+       token = context.headers.authorization; 
+       console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
+      }
+      //verify token
+      const user = await verifyToken(token);
+      //creating hash token
       const hashToken = (string) =>{
         let hash = 0;
         if (string.length === 0)
@@ -170,7 +181,7 @@ const resolvers = {
         return result;
       }
 
-            //getUUID
+      //getUUID for new Delivery
       let session = driver.session();
        const myUUID = await session.run(`return randomUUID()`,{
          }).then(async (result)=>{
@@ -180,6 +191,7 @@ const resolvers = {
          });
         
         //My hash to reference
+
         const myHash = hashToken(`${myUUID} ${new Date().toISOString()}`); 
       
 
@@ -187,7 +199,6 @@ const resolvers = {
         console.log("ERROR AUTH")
         throw new AuthenticationError('must authenticate');
       }
-      else{
         //First at all we create our firestore delivery
         //step number 1, we create our UUID
         console.log(`UUID ${myUUID}`)
@@ -203,26 +214,17 @@ const resolvers = {
               console.log(JSON.stringify(result))
               return result.records[0]._fields[0].properties
             });
+        
+      
         console.log(`direccion ${JSON.stringify(myNewAddress)}`);
-        //step 3, we create on firebase our delivery 
-        const createDeliveryFirebase = await fetch(process.env.URL_CREATE_DELIVERY,{
-        method: 'POST',
-        headers:{
-          "Authorization": `Bearer ${context.headers.authorization}`,
-          'Content-Type': 'application/json'
-      	},
-        body:JSON.stringify({
-            deliveryid: myUUID,
-            client: user,
-            destination: {lat:myNewAddress.latitude,lng:myNewAddress.longitude},
-            restaurant: args.items.restaurant,
-            reference: myHash
-          })
-        }).then((responseData)=>responseData.json).then((finalResult)=>{
-          console.log(finalResult)
-        }) 
-        console.log(`user: ${user}`)
-      }
+        session = driver.session();
+        const restaurantData = await session.run(`
+            match (r:restaurant)<-[]-(p:person) where r.id = $id return p,r
+          `,{id: args.items.restaurant}).then((result)=>{
+            return {owner:result.records[0]._fields[0].properties,restaurant:result.records[0]._fields[1].properties};
+          });
+        
+      //Start Processing data
       //We declare an temp array to iterate the repeated values on our get
       let tempArray = [];
       //We will use a validator in the loop for knowing where the value repeats
@@ -289,11 +291,36 @@ const resolvers = {
           }
 
       });
-       console.log(`Items ${JSON.stringify(tempArray)}`) 
+      //End of processing data
+
+      //step 3, we create on firebase our delivery 
+        const createDeliveryFirebase = await fetch(process.env.URL_CREATE_DELIVERY,{
+        method: 'POST',
+        headers:{
+          "Authorization": `Bearer ${context.headers.authorization}`,
+          'Content-Type': 'application/json'
+      	},
+        body:JSON.stringify({
+            deliveryid: myUUID,
+            client: user,
+            destination: {lat:myNewAddress.latitude,lng:myNewAddress.longitude},
+            restaurant: args.items.restaurant,
+            reference: myHash,
+            owner: restaurantData.owner.id,
+            items: tempArray,
+            restaurantLocation: {lat:restaurantData.restaurant.latitude,lng:restaurantData.restaurant.longitude}
+          })
+        }).then((responseData)=>responseData.json).then((finalResult)=>{
+          console.log(finalResult)
+        }) 
+        console.log(`user: ${user}`)
+      
+
+       //console.log(`Items ${JSON.stringify(tempArray)}`) 
       let response = {};
       const dataToUse = args.items.items;
-       session = driver.session();
-
+      //We start to save our delivery in our database
+      session = driver.session();
       const setData = session.run(`
         unwind $items as items
         match (i:item) where i.id = items.id

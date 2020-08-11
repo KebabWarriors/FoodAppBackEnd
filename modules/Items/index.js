@@ -339,7 +339,7 @@ const resolvers = {
           merge (r)-[:HAS]->(i)
           with i,t,r
           unwind $option as rs
-          merge (i)-[:IS_TYPE]->(b:restriction{id: randomUUID(),name:rs.nameRestriction})
+          merge (i)-[:IS_TYPE]->(b:restriction{id: randomUUID(),name:rs.nameRestriction,required:rs.required,quantity:rs.quantity})
           with i,t,r,rs,b 
           match (d:restrictionType) where d.id = rs.idRestrictionType
           with i,t,r,rs,d,b

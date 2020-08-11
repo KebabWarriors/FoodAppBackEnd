@@ -19,6 +19,8 @@ const typeDefs = `
     address: String
     description: String
     photo: String
+    latitude: Float
+    longitude: Float
   }
 
   extend type Query{
@@ -34,7 +36,7 @@ const typeDefs = `
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String): Restaurant
+    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float): Restaurant
     deleteRestaurant(id: String): Boolean
   }
 `;
@@ -383,7 +385,7 @@ const resolvers = {
       const getData = await session.run(
         ` match (p:person) where p.id = $owner 
           with p as pe 
-          match (r:restaurant) where r.id = $id set r.name = $name, r.image = $photo,r.address = $address,r.description = $description 
+          match (r:restaurant) where r.id = $id set r.name = $name, r.image = $photo,r.address = $address,r.description = $description, r.latitude = $latitud, r.longitude = $longitud 
           with pe,r
           match (rt:restaurantsType) where ${alias} 
           with collect(rt) as myList,pe,r
@@ -398,7 +400,9 @@ const resolvers = {
           photo: args.photo,
           address:args.address,
           owner:args.owner,
-          description: args.description
+          description: args.description,
+          latitud: args.latitude,
+          longitud: args.longitude
         }
       ).then( async (result) => {
         await session.close();
