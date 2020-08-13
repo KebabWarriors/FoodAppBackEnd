@@ -308,7 +308,8 @@ const resolvers = {
             reference: myHash,
             owner: restaurantData.owner.id,
             items: tempArray,
-            restaurantLocation: {lat:restaurantData.restaurant.latitude,lng:restaurantData.restaurant.longitude}
+            restaurantLocation: {lat:restaurantData.restaurant.latitude,lng:restaurantData.restaurant.longitude},
+            restaurantName: restaurantData.restaurant.name
           })
         }).then((responseData)=>responseData.json).then((finalResult)=>{
           console.log(finalResult)

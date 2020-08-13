@@ -1,8 +1,11 @@
 const { driver } = require('../../conf/connection.js');
+const { addToStorage } = require('../../helpers/upload');
 const fetch = require('cross-fetch');
 
 const typeDefs = `
 	
+  scalar Upload  
+
   type RestaurantType{
     id: ID
     name: String
@@ -31,18 +34,22 @@ const typeDefs = `
     restaurantsWithoutType: [Restaurant]
     restaurantsByType(id: ID): [Restaurant] 
     restaurantsType: [RestaurantType]
+    getBucket: Boolean
   }
 
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float): Restaurant
+    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float, file:Upload): Restaurant
     deleteRestaurant(id: String): Boolean
   }
 `;
 
 const resolvers = {
   Query:{
+    getBucket: async (parent, args) =>{
+       addToStorage();
+    },
     restaurantsType: async (parent, args) => {
       console.log(`restaurantsType: ${args}`);
 	    const session = driver.session();
@@ -364,6 +371,8 @@ const resolvers = {
     },
     editRestaurant: async (parent, args) =>{
       console.log(`editRestaurant: ${JSON.stringify(args)}`);
+      const image = addToStorage(args.file);
+      console.log(`image: ${JSON.stringify(image)}`);
       const session = driver.session();
       let response = {};
       let params = {};
