@@ -9,17 +9,18 @@ const gc = new Storage({
   projectId: "restaurantweb"
 });
 
-const imagesBuckect = gc.bucket('biitemages');
+const imagesBucket = gc.bucket('biitemages');
 
 async function addToStorage(file){
   //gc.getBuckets().then(x => console.log(x));
+  console.log(`IMAGE: ${JSON.stringify(file)}`)
   try{
     const { createReadStream, filename } = await file;
 
         await new Promise(res =>
           createReadStream()
             .pipe(
-              coolFilesBucket.file(filename).createWriteStream({
+              imagesBucket.file(filename).createWriteStream({
                 resumable: false,
                 gzip: true
               })

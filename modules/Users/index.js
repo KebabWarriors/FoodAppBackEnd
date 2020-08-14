@@ -73,6 +73,7 @@ const typeDefs = `
     addCardToPerson(id: String,cardNumber: String,expMonth:Int,expYear:Int,cvc: Int,name: String): Cards
     deleteAddress(person:String,address:String): Boolean
     setDriverOnline(id:String,location:[Float]): String
+    deleteDriver(id: String): Boolean
  }
  
 `;
@@ -260,13 +261,16 @@ const resolvers = {
         return person;
     },
     addDriver: async (parent,args,context,info) => {
-	    console.log('addDrvier');
-	    //console.log(JSON.stringify(args));
+	    console.log('addDriver');
+	    console.log(JSON.stringify(args));
 	    let userId = "";
 	    let person = {};
 	    const newUser = await fetch(`${process.env.CREATE_DRIVER_URL}`,{
-	        method: 'POST',
-          body: JSON.stringify({email: args.email,name:args.name})
+          method: 'POST',
+               headers:{
+                'Content-Type': 'application/json'
+      	      },
+              body: JSON.stringify({email: args.email,name: args.name})
          }).then((response) => response.json()).then((result)=>{
 	        userId = result.uid;
 	        console.log(result);
@@ -283,7 +287,7 @@ const resolvers = {
 		      phone: $phone
 	      }) return p`,
 	      {
-	        id: userId.userSub,
+	        id: userId,
 	        email: args.email,
 	        name: args.name,
 	        lastname: args.lastname,
@@ -569,6 +573,32 @@ const resolvers = {
         }).then((result)=>{
            response.id = result.uid 
         });
+      return response;
+    },
+    deleteDriver: async(parent,args)=>{
+      console.log(`delete Driver`)
+      let response = false;
+      const session = driver.session();
+      const deleteDriverOnFirestore = await fetch(process.env.URL_DELETE_DRIVER,{
+        method: 'POST',
+
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body: JSON.stringify({id: args.id})
+      }).then( async (result)=>{
+        console.log(result)
+            const deleteDriver = await session.run(`
+              match (p:person) where p.id = $id
+              detach delete p
+            `,{
+                id: args.id
+              }).then(async (result)=>{
+                await session.close();
+                response = true;
+              });
+      }).catch((error)=>console.log(error));
+      
       return response;
     }
   }

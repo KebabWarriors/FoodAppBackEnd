@@ -4,7 +4,6 @@ const fetch = require('cross-fetch');
 
 const typeDefs = `
 	
-  scalar Upload  
 
   type RestaurantType{
     id: ID
@@ -21,7 +20,6 @@ const typeDefs = `
     owner: Person,
     address: String
     description: String
-    photo: String
     latitude: Float
     longitude: Float
   }
@@ -40,7 +38,8 @@ const typeDefs = `
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float, file:Upload): Restaurant
+    editRestaurant(restaurant:String,name: String, image: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float): Restaurant
+    uploadRestaurantPhoto(file: Upload): String
     deleteRestaurant(id: String): Boolean
   }
 `;
@@ -371,8 +370,8 @@ const resolvers = {
     },
     editRestaurant: async (parent, args) =>{
       console.log(`editRestaurant: ${JSON.stringify(args)}`);
-      const image = addToStorage(args.file);
-      console.log(`image: ${JSON.stringify(image)}`);
+      //const image = await addToStorage(args.file);
+      //console.log(`image: ${JSON.stringify(args.file)}`);
       const session = driver.session();
       let response = {};
       let params = {};
@@ -406,7 +405,7 @@ const resolvers = {
         {
           id: args.restaurant,
           name: args.name, 
-          photo: args.photo,
+          photo: args.image,
           address:args.address,
           owner:args.owner,
           description: args.description,
@@ -443,7 +442,29 @@ const resolvers = {
           response = true;
       });
     return response;
-  }
+  },
+    uploadRestaurantPhoto: async (parent, args)=>{
+     try{
+      args.file.then(file =>{
+        console.log(file)
+      });
+      const { stream, filename, mimetype, encoding } = await file;
+
+      // 1. Validate file metadata.
+
+      // 2. Stream file contents into cloud storage:
+      // https://nodejs.org/api/stream.html
+
+      // 3. Record the file upload in your DB.
+      // const id = await recordFile( … )
+
+      console.log(JSON.stringify( { filename, mimetype, encoding }));
+      return "yes";
+     }catch(error){
+        console.log(`Error ${error}`)
+        console.log(JSON.stringify(args.type))
+     }
+    }
   }
 }
 

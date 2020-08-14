@@ -150,11 +150,9 @@ const resolvers = {
       let token;
       //Verify if auth cames with lowercase or upper case
       if(context.headers.Authorization !== undefined){
-        console.log(`token ${JSON.stringify(context.headers.Authorization.split(" ")[1])}`);
         token = context.headers.Authorization;
       }else{
        token = context.headers.authorization; 
-       console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
       }
       //verify token
       const user = await verifyToken(token);
@@ -185,7 +183,6 @@ const resolvers = {
       let session = driver.session();
        const myUUID = await session.run(`return randomUUID()`,{
          }).then(async (result)=>{
-           console.log(`UUID ${JSON.stringify(result.records)}`)
             await session.close();
             return result.records[0]._fields[0];
          });
@@ -201,7 +198,6 @@ const resolvers = {
       }
         //First at all we create our firestore delivery
         //step number 1, we create our UUID
-        console.log(`UUID ${myUUID}`)
         //step 2, we get the address 
          session = driver.session();
 
@@ -216,11 +212,11 @@ const resolvers = {
             });
         
       
-        console.log(`direccion ${JSON.stringify(myNewAddress)}`);
         session = driver.session();
         const restaurantData = await session.run(`
             match (r:restaurant)<-[]-(p:person) where r.id = $id return p,r
           `,{id: args.items.restaurant}).then((result)=>{
+            session.close();
             return {owner:result.records[0]._fields[0].properties,restaurant:result.records[0]._fields[1].properties};
           });
         
@@ -293,7 +289,44 @@ const resolvers = {
       });
       //End of processing data
 
-      //step 3, we create on firebase our delivery 
+      //step 3, calculating price of items in delivery
+       session = driver.session();
+        const getPriceOfDelivery = await session.run(`
+            unwind $items as items
+            match (i:item) where i.id = items.id
+            with sum(i.price * items.amount) as price
+            return price+2.90
+          `,{
+          items: tempArray
+        }).then( async (result)=>{
+            await session.close();
+            console.log(`ITEMS: ${JSON.stringify(result.records[0]._fields[0])}`)
+            return result.records[0]._fields[0];
+        }).catch(error=>console.log(`error calculating price ${error}`));
+        let itemsForFirebase =  tempArray;
+      
+      //step 4, replacing restrictions on Items
+       session = driver.session();
+        const getItemsWithRestrictions = await session.run(`
+          unwind $items as items
+          match (i:item) where i.id = items.id
+          with i,items
+          unwind items.restrictions as itemsRestrictions
+          match (restriction:restriction) where restriction.id = itemsRestrictions.restrictionId
+          with i,items,itemsRestrictions,restriction
+          unwind itemsRestrictions.restrictionValue as values
+          match(restrictionValue:restrictionValue) where restrictionValue.id = values
+          return i,itemsRestrictions,restriction,values,restrictionValue
+        `,{
+          items: tempArray
+        }).then(async (result)=>{
+            result.records.forEach((value,key)=>{
+                console.log(JSON.stringify(value))        
+            });
+        }).catch(error=>console.log(error));
+
+
+      //step 5, we create on firebase our delivery 
         const createDeliveryFirebase = await fetch(process.env.URL_CREATE_DELIVERY,{
         method: 'POST',
         headers:{
@@ -309,10 +342,12 @@ const resolvers = {
             owner: restaurantData.owner.id,
             items: tempArray,
             restaurantLocation: {lat:restaurantData.restaurant.latitude,lng:restaurantData.restaurant.longitude},
-            restaurantName: restaurantData.restaurant.name
+            restaurantName: restaurantData.restaurant.name,
+            price: getPriceOfDelivery,
+            type: args.type
           })
         }).then((responseData)=>responseData.json).then((finalResult)=>{
-          console.log(finalResult)
+          //console.log(finalResult)
         }) 
         console.log(`user: ${user}`)
       
@@ -388,7 +423,7 @@ const resolvers = {
             ... result.records[0]._fields[4].properties
           }
         }
-        console.log(result.records[0]._fields[0])
+        //console.log(result.records[0]._fields[0])
         
       }).catch((error) => {
         console.log(`error in add delivery ${error}`);

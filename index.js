@@ -1,9 +1,9 @@
 const { ApolloServer } = require('apollo-server-lambda');
+const {typeDefs, resolvers} = require('./_all.js');
 
 const server = new ApolloServer({
-  modules:[
-    require('./_all.js'),
-  ],
+  typeDefs,
+  resolvers,
   playground: {
     endpoint: "/dev/graphql"
   },
@@ -16,9 +16,10 @@ const server = new ApolloServer({
 });
 
 const withCors = handler => (req, res, ...args) => {
-  if (req.method === 'OPTIONS')
+  if (req.method === 'OPTIONS'){
     // add required headers here
     res.end()
+  }
   else {
     return handler(req, res, ...args)
   }
@@ -30,7 +31,7 @@ exports.graphqlHandler = withCors(server.createHandler({
   cors: {
     origin: '*',
     methods: ['POST', 'GET'],
-    allowedHeaders: ['Content-Type', 'Origin', 'Accept',"token","authorization","Authorization"],
+    allowedHeaders: ['Content-Type','content-type' ,'Origin', 'Accept',"token","authorization","Authorization"],
     credentials: true,
   },
 }));

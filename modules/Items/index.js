@@ -91,10 +91,12 @@ const typeDefs = `
   }
 
   extend type Mutation{
-    addItem(name: String, description: String, type: ID,price: Float,restaurant: ID,restriction: [StorageRestrictions]): Item
+    addItem(name: String, description: String, type: ID,price: Float,restaurant: ID,image: String,restriction: [StorageRestrictions]): Item
     addItemType(name: String): ItemType
     addRestrictionType(name: String): RestrictionType
     addRestiction(type: ID): Restriction
+    editItem(id: String, name: String, description: String, type: String,price: Float,image: String): Item
+    deleteItem(id: String): Boolean
   }
 
 `;
@@ -116,7 +118,7 @@ const resolvers = {
           id: args.id
         }).then(async (result) =>{
           await session.close();
-	if(result.records.length > 0){
+	      if(result.records.length > 0){
           result.records.forEach((value,item)=>{
             //we verify if we have the restaurant in our object
             response.push(
@@ -132,30 +134,30 @@ const resolvers = {
         return response;
     },
     itemTypes: async (parent, args) =>{
-	console.log(`Items Type`);
-	const session = driver.session();
-	let response = [];
-	const getData = await session.run(`
-	  match (i:itemType) return i
-	`,{}).then(async (result)=>{
-	   result.records.forEach((value,item)=>{
-		response.push(value._fields[0].properties);
-	   });
-	}).catch(error => console.log(`ERROR ${ERROR}`));
-	return response;
+	    console.log(`Items Type`);
+	    const session = driver.session();
+	    let response = [];
+	    const getData = await session.run(`
+	      match (i:itemType) return i
+	    `,{}).then(async (result)=>{
+	        result.records.forEach((value,item)=>{
+		      response.push(value._fields[0].properties);
+	      });
+	    }).catch(error => console.log(`ERROR ${ERROR}`));
+	    return response;
     },
     restrictionTypes: async (parent,args) =>{
-	console.log(`Restrictions Types`);
-	const session = driver.session();
-	let response = [];
-	const getData = await session.run(`
-	  match (r:restrictionType) return r
-	`,
-	{}).then(async (result)=>{
-	  await session.close();
-	  result.records.forEach((value,item)=>{
-	    response.push(value._fields[0].properties);
-	  });
+	    console.log(`Restrictions Types`);
+	    const session = driver.session();
+	    let response = [];
+	    const getData = await session.run(`
+	      match (r:restrictionType) return r
+	    `,
+	    {}).then(async (result)=>{
+	      await session.close();
+	      result.records.forEach((value,item)=>{
+	      response.push(value._fields[0].properties);
+	    });
 	}).catch(error => console.log(`Error ${error}`));
 	return response;
     },
@@ -329,7 +331,7 @@ const resolvers = {
 
       const setData = await session.run(
         `
-          CREATE (i:item {id: randomUUID(),name: $name, description: $description, price:$price})
+          CREATE (i:item {id: randomUUID(),name: $name, description: $description, price:$price,image:$image})
           with i
           match (t:itemType) where t.id =  $itemType
           with i,t
@@ -339,7 +341,7 @@ const resolvers = {
           merge (r)-[:HAS]->(i)
           with i,t,r
           unwind $option as rs
-          merge (i)-[:IS_TYPE]->(b:restriction{id: randomUUID(),name:rs.nameRestriction,required:rs.required,quantity:rs.quantity})
+          merge (i)-[:HAS]->(b:restriction{id: randomUUID(),name:rs.nameRestriction,required:rs.required,quantity:rs.quantity})
           with i,t,r,rs,b 
           match (d:restrictionType) where d.id = rs.idRestrictionType
           with i,t,r,rs,d,b
@@ -355,7 +357,8 @@ const resolvers = {
             price: args.price,
             itemType: args.type,
             restaurant: args.restaurant,
-            option: args.restriction
+            option: args.restriction,
+            image: args.image
           }
         ).then(async (result)=>{
           //Item, ItemType, Restaurant, Options, Restriction, 
@@ -377,6 +380,52 @@ const resolvers = {
         });
 
       });
+      console.log(`RESPUESTA ITEMS: ${JSON.stringify(response)}`)
+        return response;
+      },
+      editItem: async(parent,args)=>{
+        console.log(`EDITAR PLATILLO`);
+        const session = driver.session();
+        let response = {};  
+        const editItem = await session.run(`
+            match (i:item) where i.id = $id set i.name = $name, i.description = $description, i.price=$price,i.image=$image
+            with i
+            match (i)-[s]->(it:itemType)
+            delete s
+            with i
+            match (it:itemType) where it.id = $type
+            create (i)-[:IS_TYPE]->(it)
+            return i,it
+          `,{
+              id: args.id,
+              name: args.name,
+              description: args.description,
+              price: args.price,
+              image: args.image,
+              type: args.type
+          }).then(async(result)=>{
+             await session.close();
+              response = {...result.records[0]._fields[0].properties,type:result.records[0]._fields[1].properties}; 
+          }).catch(error=>console.log(`ERROR AL EDITAR PLATILLO ${JSON.stringify(error)}`));
+        return response;
+      },
+      deleteItem: async(parent,args)=>{
+        const session = driver.session();
+        let response = false;
+        const deleteItem =  await session.run(`
+          match (i:item)<-[j]-(r:restaurant),
+                (i)-[k]->(it:itemType),
+                (i)-[l]->(res:restriction),
+                (res)-[m]->(rt:restrictionType),
+                (res)<-[n]-(rv:restrictionValue)
+          where i.id = $id 
+          delete  j,k,l,m,n,i,res,rv
+        `,{
+          id: args.id
+        }).then(async(result)=>{
+            await session.close();  
+            response = true;            
+        });
         return response;
       }
     }
