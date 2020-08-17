@@ -38,7 +38,7 @@ const typeDefs = `
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    editRestaurant(restaurant:String,name: String, image: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float): Restaurant
+    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float): Restaurant
     uploadRestaurantPhoto(file: Upload): String
     deleteRestaurant(id: String): Boolean
   }
@@ -115,8 +115,8 @@ const resolvers = {
       let iteratorTool = null;
       const getData = await session.run(
         `match (r:restaurant),
-          (p:person)-[]->(r) where p.id = $owner and r.id = $restaurant
-          return r,p`,
+          (p:person)-[]->(r)-[]->(rt:restaurantsType) where p.id = $owner and r.id = $restaurant
+          return r,p,rt`,
           {
         	  owner: args.owner,
             restaurant: args.restaurant
@@ -124,7 +124,11 @@ const resolvers = {
       ).then((result) => {
 	      console.log(JSON.stringify(result.records[1]))
 	      if(result.records.length > 0){
-		        response = {...result.records[0]._fields[0].properties, owner: result.records[0]._fields[1].properties};
+		        response = {
+              ...result.records[0]._fields[0].properties, 
+              owner: result.records[0]._fields[1].properties,
+              type: result.records[0]._fields[2].properties
+            };
 	      }
       })
 	    return response;
@@ -396,7 +400,7 @@ const resolvers = {
           match (r:restaurant) where r.id = $id set r.name = $name, r.image = $photo,r.address = $address,r.description = $description, r.latitude = $latitud, r.longitude = $longitud 
           with pe,r
           match (rt:restaurantsType) where ${alias} 
-          with collect(rt) as myList,pe,r
+          with rt as myList,pe,r
           unwind  myList as x 
           merge (pe)-[:owns]->(r) 
           merge (r)-[:is_type]->(x) 
@@ -405,7 +409,7 @@ const resolvers = {
         {
           id: args.restaurant,
           name: args.name, 
-          photo: args.image,
+          photo: args.photo,
           address:args.address,
           owner:args.owner,
           description: args.description,

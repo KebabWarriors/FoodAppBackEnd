@@ -66,7 +66,7 @@ const typeDefs = `
     addPerson(id:ID): Person
     addDriver(email: String!, name: String!, lastname: String!, dui: String!,address: String!, phone: String!): Person 
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
-    addAddressToPerson(person: ID,address: String,build: String,door:String): Address 
+    addAddressToPerson(name:String,person: ID,address: String,build: String,door:String,latitude:Float,longitude:Float): Address 
     updateAddress(id: ID!, streetAddress: String, build: String, door: String, latitude: String, logintude: String): Address
     signPerson(person: NewUser): Person
     confirmUser(email: String): Person
@@ -296,10 +296,10 @@ const resolvers = {
 	        phone: args.phone
 	      }).then(async (result) => {
           await session.close();
-          //console.log(result.records[0]._fields[0].properties);
+          console.log(result.records[0]._fields[0].properties);
           person = result.records[0]._fields[0].properties;
         }).catch((error) =>{
-          return  {id: 0,name: "error", email: "error",password: "error",phone: "error"}
+           console.log( JSON.stringify({id: 0,name: "error", email: "error",password: "error",phone: "error"}));
         });	
 	    return person;
     },
@@ -387,10 +387,13 @@ const resolvers = {
 
       return payload;
     },
-    addAddressToPerson: async (parent, args)=>{
+    addAddressToPerson: async (parent, args,context,info)=>{
+      console.log(`ADD ADDRESS TO PERSON`);
+      console.log(`args: ${JSON.stringify(args)}`)
       let newAddress;
       let tempAddress;
       let url = encodeURI(`${args.address}`);
+      console.log(url);
       const getLatAndLng = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${url}&key=AIzaSyASuTepGP3k9VxIPOO0cbnymrKINq3mI0c`,{
         method: 'GET',
         headers:{
@@ -398,8 +401,37 @@ const resolvers = {
         }
       }).then(response => response.json()).then((result) =>{
         newAddress = result;
-        
+        console.log(JSON.stringify(result));
       });
+
+      //Start Verify
+        let token;
+      if(context.headers.Authorization !== undefined){
+      console.log(`token ${JSON.stringify(context.headers.Authorization.split(" ")[1])}`);
+      token = context.headers.Authorization.split(" ")[1];
+      }else{
+       token = context.headers.authorization.split(" ")[1]; 
+       console.log(`token ${JSON.stringify(context.headers.authorization.split(" ")[1])}`);
+      }
+      let userId = null;
+      const userToken = await fetch(`${process.env.TOKEN_VERIFICATION_URL}`,{
+	      method: 'POST',
+        headers:{
+          "token": token,
+           'Content-Type': 'application/json'
+      	},
+	        body:JSON.stringify({token:token})
+      }).then((response) => {
+	      console.log(`Data: ${JSON.stringify(response)}`); 
+	      return response.json(); 
+	    }).then((result)=>{
+	        console.log(`result ${JSON.stringify(result)}`);
+	        userId = result;
+      }).catch(error => console.log(`ERROR ${error}`));
+
+      //End Verify
+
+
       
       const session = driver.session();
       let response = {};
@@ -412,6 +444,8 @@ const resolvers = {
         {
           lat: newAddress.results[0].geometry.location.lat.toString(),
           lon: newAddress.results[0].geometry.location.lng.toString()
+          //lat: args.latitude,
+          //lon: args.longitude
         }
       ).then((result)=>{
         tempAddress = result;
@@ -429,7 +463,7 @@ const resolvers = {
               return a    
             `,
             {
-              id: args.person,
+              id: userId,
               address: tempAddress.records[0]._fields[0].properties.id
             }
           ).then(async (result)=>{
@@ -438,7 +472,7 @@ const resolvers = {
           });
       }else{
         const createNewAddress = await session.run(`
-          create (a:address{id:randomUUID(),latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address,name: $name})
+          create (a:address{id:randomUUID(),latitude: $lat,longitude:$lon,build:$build,door:$door,address:$address,name: $name,streetAddress:$address})
           with a
           match (p:person) where p.id = $id
           with a,p
@@ -448,11 +482,14 @@ const resolvers = {
         {
           lat: newAddress.results[0].geometry.location.lat.toString(),
           lon: newAddress.results[0].geometry.location.lng.toString(),
+          //lat: args.latitude,
+          //lon: args.longitude,
           build: args.build,
           door: args.door,
-          id: args.person,
+          id: userId,
           address: args.address,
-	        name: args.name
+	        name: args.name,
+          streetAddress: args.address
         }).then(async (result)=>{
           await session.close();
           response = result.records[0]._fields[0].properties;
