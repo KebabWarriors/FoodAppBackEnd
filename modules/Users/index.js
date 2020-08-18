@@ -394,7 +394,7 @@ const resolvers = {
       let tempAddress;
       let url = encodeURI(`${args.address}`);
       console.log(url);
-      const getLatAndLng = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${url}&key=AIzaSyASuTepGP3k9VxIPOO0cbnymrKINq3mI0c`,{
+      const getLatAndLng = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${url}&key=AIzaSyAmYOioM9cACewLOX-OvPCe0_yhl_ivjlk`,{
         method: 'GET',
         headers:{
           "ContentType": "application/json"

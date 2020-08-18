@@ -38,7 +38,7 @@ const typeDefs = `
   extend type Mutation{
     addRestaurantType(name: String): RestaurantType
     addRestaurantWithOwner(name: String, owner: String): Restaurant
-    editRestaurant(restaurant:String,name: String, photo: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float): Restaurant
+    editRestaurant(restaurant:String,name: String, image: String, type: [String], owner: ID, address: String,description: String,latitude: Float,longitude: Float): Restaurant
     uploadRestaurantPhoto(file: Upload): String
     deleteRestaurant(id: String): Boolean
   }
@@ -110,7 +110,7 @@ const resolvers = {
     },
     restaurantByOwner: async (parent,args)=>{
 	    const session = driver.session();
-      console.log(`restaurant: ${args}`);
+      console.log(`restaurant by owner`);
       let response = {};
       let iteratorTool = null;
       const getData = await session.run(
@@ -122,13 +122,16 @@ const resolvers = {
             restaurant: args.restaurant
           }
       ).then((result) => {
-	      console.log(JSON.stringify(result.records[1]))
+	      console.log(JSON.stringify(result.records[0]))
 	      if(result.records.length > 0){
 		        response = {
               ...result.records[0]._fields[0].properties, 
               owner: result.records[0]._fields[1].properties,
-              type: result.records[0]._fields[2].properties
+              type:[] 
             };
+          result.records.forEach((value)=>{
+              response.type.push(value._fields[2].properties)
+          });
 	      }
       })
 	    return response;
@@ -409,7 +412,7 @@ const resolvers = {
         {
           id: args.restaurant,
           name: args.name, 
-          photo: args.photo,
+          photo: args.image,
           address:args.address,
           owner:args.owner,
           description: args.description,

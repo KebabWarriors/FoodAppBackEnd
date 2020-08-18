@@ -384,16 +384,18 @@ const resolvers = {
         return response;
       },
       editItem: async(parent,args)=>{
-        console.log(`EDITAR PLATILLO`);
+        console.log(`EDITAR PLATILLO ${JSON.stringify(args)}`);
         const session = driver.session();
         let response = {};  
         const editItem = await session.run(`
             match (i:item) where i.id = $id set i.name = $name, i.description = $description, i.price=$price,i.image=$image
             with i
             match (i)-[s]->(it:itemType)
+            with i,s
             delete s
             with i
             match (it:itemType) where it.id = $type
+            with i,it
             create (i)-[:IS_TYPE]->(it)
             return i,it
           `,{
