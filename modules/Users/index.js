@@ -26,7 +26,11 @@ const typeDefs = `
     verified: Boolean
     phone: String
     costumerId: String
+    image: String
+    vehicle: Int
+    registration: String
   }
+  
 
   type Address{
     streetAddress: String
@@ -64,7 +68,7 @@ const typeDefs = `
 
   extend type Mutation{
     addPerson(id:ID): Person
-    addDriver(email: String!, name: String!, lastname: String!, dui: String!,address: String!, phone: String!): Person 
+    addDriver(email: String!, name: String!, lastname: String!, dui: String!,address: String!, phone: String!,image: String!,registration: String!, vehicle: Int!): Person 
     updatePerson(id: ID!,name: String, email: String, password: String,phone:String): Person
     addAddressToPerson(name:String,person: ID,address: String,build: String,door:String,latitude:Float,longitude:Float): Address 
     updateAddress(id: ID!, streetAddress: String, build: String, door: String, latitude: String, logintude: String): Address
@@ -284,7 +288,10 @@ const resolvers = {
 		      lastname: $lastname, 
 		      dui: $dui, 
 		      address: $address, 
-		      phone: $phone
+		      phone: $phone,
+          vehicle: $vehicle,
+          registration: $registration,
+          image: $image
 	      }) return p`,
 	      {
 	        id: userId,
@@ -293,7 +300,10 @@ const resolvers = {
 	        lastname: args.lastname,
 	        dui: args.dui,
 	        address: args.address,
-	        phone: args.phone
+	        phone: args.phone,
+          vehicle: args.vehicle,
+          registration: args.registration,
+          image: args.image
 	      }).then(async (result) => {
           await session.close();
           console.log(result.records[0]._fields[0].properties);
