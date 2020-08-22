@@ -29,6 +29,7 @@ const typeDefs = `
     image: String
     vehicle: Int
     registration: String
+    debt: Float
   }
   
 
@@ -64,6 +65,7 @@ const typeDefs = `
     login: Person
     cardsByUser(id: ID): [Cards]
     addressByUser(id: ID): [Address]
+    paymentsDue: [Person]
   }
 
   extend type Mutation{
@@ -231,6 +233,18 @@ const resolvers = {
         });
       });
       return response;
+    },
+    paymentsDue: async (parent,args){
+      let response = [];
+      const session = driver.session();
+      const getPeople = session.run(`
+        match (p:person) where p.type = 2 return p
+        `,{}).then((result)=>{
+            result.records.forEach((value,item)=>{
+              response.push({...value.fields[0].properties});
+            });
+        }).catch((error)=>console.log(`Error getting payments due: ${JSON.stringify(error)}`));
+      return response;
     }
   },
   User:{
@@ -291,7 +305,8 @@ const resolvers = {
 		      phone: $phone,
           vehicle: $vehicle,
           registration: $registration,
-          image: $image
+          image: $image,
+          debt: 0
 	      }) return p`,
 	      {
 	        id: userId,
