@@ -80,6 +80,7 @@ const typeDefs = `
     deleteAddress(person:String,address:String): Boolean
     setDriverOnline(id:String,location:[Float]): String
     deleteDriver(id: String): Boolean
+    payDue(id: String): Boolean
  }
  
 `;
@@ -228,21 +229,27 @@ const resolvers = {
       ).then(async (result) =>{
         await session.close();
         result.records.forEach((value,item)=>{
-	        console.log(`data: ${value._fields[0].properties}`);
+	        console.log(`Address ${item}: ${JSON.stringify(value._fields[0].properties)}`);
           response.push({...value._fields[0].properties})
         });
       });
       return response;
     },
-    paymentsDue: async (parent,args){
+    paymentsDue: async (parent,args) =>{
+      console.log(`Payments due`);
       let response = [];
       const session = driver.session();
-      const getPeople = session.run(`
-        match (p:person) where p.type = 2 return p
-        `,{}).then((result)=>{
+      const getPeople = await session.run(`
+        match (p:person) where p.type = 2 and p.debt > 0 return p
+        `,{}).then(async (result)=>{
+            await session.close();
+            console.log(JSON.stringify(result.records))
             result.records.forEach((value,item)=>{
-              response.push({...value.fields[0].properties});
+              //console.log(`VALUES ${JSON.stringify(value._fields[0].properties)}`)
+              //console.log(JSON.stringify(value._fields[0].properties))
+              response.push({...value._fields[0].properties});
             });
+          //console.log(`Respuesta sera: ${JSON.stringify(response)}`);
         }).catch((error)=>console.log(`Error getting payments due: ${JSON.stringify(error)}`));
       return response;
     }
@@ -661,6 +668,19 @@ const resolvers = {
               });
       }).catch((error)=>console.log(error));
       
+      return response;
+    },
+    payDue: async (parent,args)=>{
+      let response = false;
+      const session = driver.session();
+      const payDue = await session.run(`
+          match (p:person) where p.id = $id set p.debt = 0 return p
+        `,{
+          id: args.id
+        }).then(async(result)=>{
+          session.close();
+          response = true;
+        }).catch(error=>console.log(`error: ${error}`));
       return response;
     }
   }
