@@ -148,6 +148,7 @@ const resolvers = {
     addDelivery: async (parent, args,context,info) => {
       console.log("addDelivery");
       let token;
+      console.log(JSON.stringify(args))
       //Verify if auth cames with lowercase or upper case
       if(context.headers.Authorization !== undefined){
         token = context.headers.Authorization;
@@ -200,26 +201,28 @@ const resolvers = {
         //step number 1, we create our UUID
         //step 2, we get the address 
          session = driver.session();
-
+          console.log('address') 
           const myNewAddress = await session.run(`
               match (a:address) where a.id = $id return a
             `,{
                 id: args.items.address
             }).then(async (result)=>{
               await session.close();
-              console.log(JSON.stringify(result))
-              return result.records[0]._fields[0].properties
-            });
+              console.log(JSON.stringify(result.records[0]._fields[0].properties));
+              return result.records[0]._fields[0].properties;
+            }).catch(error=>console.log(`error ${error}`));
         
       
         session = driver.session();
+      console.log('restaurant')
         const restaurantData = await session.run(`
             match (r:restaurant)<-[]-(p:person) where r.id = $id return p,r
           `,{id: args.items.restaurant}).then((result)=>{
             session.close();
             return {owner:result.records[0]._fields[0].properties,restaurant:result.records[0]._fields[1].properties};
-          });
+          }).catch(error => console.log(`Error restaurants on delivery ${JSON.stringify(error)}`));
         
+      console.log('start processing data')
       //Start Processing data
       //We declare an temp array to iterate the repeated values on our get
       let tempArray = [];
@@ -232,9 +235,10 @@ const resolvers = {
 	      }).then(async function(result){
 	        sessionCard.close();
 	        return result.records[0]._fields[0].properties;
-	      });
+	      }).catch(error=>console.log(`error with card ${error}`));
       }
       //To know which value repeats we use a function comparing to objects
+      console.log('restrictions for each')
       const restrictionsValidator = (forComparing, toComparing) =>{
         let isTheSame = true;
         if(forComparing.length > 0){
@@ -253,13 +257,21 @@ const resolvers = {
       function getRealData(data){
         let toReturn;
         if(data.charAt(0) === "[" && data.charAt(data.length-1) === "]"){
-          toReturn = JSON.parse(data.replace(/'/g, '"'))
+          if(/'/.test(data)){
+            toReturn = JSON.parse(data.replace(/'/g, '"'))
+          }
+          else{
+            toReturn = data.slice(1,-1);
+            toReturn = toReturn.replace(/\s/g,"");
+            toReturn = toReturn.split(",");
+          } 
         }else{
           toReturn = data;
         }
         return toReturn;
       }
       let tempValue;
+      let addPrice = 0;
       args.items.items.forEach((value,key) => {
         tempArray.filter((value2,key2)=>{
           if(value2.id === value.id && restrictionsValidator(value2.restrictions, value.restrictions)){
@@ -288,7 +300,7 @@ const resolvers = {
 
       });
       //End of processing data
-
+        console.log('start getting price')
       //step 3, calculating price of items in delivery
        session = driver.session();
         const getPriceOfDelivery = await session.run(`
@@ -305,24 +317,24 @@ const resolvers = {
         }).catch(error=>console.log(`error calculating price ${error}`));
         let itemsForFirebase =  tempArray;
       
-      //step 4, replacing restrictions on Items
+      //step 4, here we have to add price of restriccions and get names
+      console.log(`TEMP ARRAY`);
+      console.log(JSON.stringify(tempArray))
        session = driver.session();
-        const getItemsWithRestrictions = await session.run(`
+        const priceOfRestrictions = await session.run(`
           unwind $items as items
-          match (i:item) where i.id = items.id
-          with i,items
-          unwind items.restrictions as itemsRestrictions
-          match (restriction:restriction) where restriction.id = itemsRestrictions.restrictionId
-          with i,items,itemsRestrictions,restriction
-          unwind itemsRestrictions.restrictionValue as values
-          match(restrictionValue:restrictionValue) where restrictionValue.id = values
-          return i,itemsRestrictions,restriction,values,restrictionValue
+          unwind items.restriction as restrictions
+          unwind restrictions.values as values
+          match (rt:restrictionValue) where rt.id = values.id
+          return sum(rt.price) 
         `,{
           items: tempArray
         }).then(async (result)=>{
-            result.records.forEach((value,key)=>{
-                console.log(JSON.stringify(value))        
-            });
+            await session.close();
+            return result.records[0]._fields[0];
+            //result.records.forEach((value,key)=>{
+            //    console.log(JSON.stringify(value))        
+            //});
         }).catch(error=>console.log(error));
 
 
@@ -343,7 +355,7 @@ const resolvers = {
             items: tempArray,
             restaurantLocation: {lat:restaurantData.restaurant.latitude,lng:restaurantData.restaurant.longitude},
             restaurantName: restaurantData.restaurant.name,
-            price: getPriceOfDelivery,
+            price: getPriceOfDelivery+priceOfRestrictions,
             type: args.type
           })
         }).then((responseData)=>responseData.json).then((finalResult)=>{
@@ -361,7 +373,7 @@ const resolvers = {
         unwind $items as items
         match (i:item) where i.id = items.id
         with sum(i.price * items.amount) as price
-        create (d:delivery{id:$delivery,state:0,total:(price+2.90),date:$date,type:$type,reference:$reference})
+        create (d:delivery{id:$delivery,state:0,total:(price+2.90+$priceOfRestrictions),date:$date,type:$type,reference:$reference})
         with d
         match (p:person) where p.id = $id
         with d,p
@@ -402,11 +414,12 @@ const resolvers = {
           id:user,
           delivery: myUUID,
           restaurant: args.items.restaurant,
-          address: args.items.address,
+          address: myNewAddress.id,
           items: tempArray,
           date: new Date().toISOString(),
 	        type: args.items.type,
-          reference: myHash
+          reference: myHash,
+          priceOfRestrictions:priceOfRestrictions 
         }
       ).then(async (result) => {
         session.close();

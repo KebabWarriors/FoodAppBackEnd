@@ -189,7 +189,18 @@ const resolvers = {
               }
             });
           
-            response.push(
+            if(iteratorTool !== null){
+              response[iteratorTool.idChild].items.push(
+                {
+                    ...value._fields[1].properties,
+                      type:value._fields[2].properties,
+                      restaurant: value._fields[0].properties
+                });
+              response.splice(iteratorTool.idChild+1,1);
+              iteratorTool = null;
+            }else{
+              //Then we add it to the correct object in the array and delete the duplicate
+              response.push(
                 {
                   ... value._fields[2].properties,
                   items:  [
@@ -201,16 +212,7 @@ const resolvers = {
                   ],
                 }
               );
-            //Then we add it to the correct object in the array and delete the duplicate
-            if(iteratorTool !== null){
-              response[iteratorTool.idChild].items.push(
-                {
-                    ...value._fields[1].properties,
-                      type:value._fields[2].properties,
-                      restaurant: value._fields[0].properties
-                });
-              response.splice(iteratorTool.idChild+1,1);
-              iteratorTool = null;
+
             }
             
           });
