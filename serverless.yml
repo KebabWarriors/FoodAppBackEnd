@@ -35,7 +35,8 @@ functions:
           response:
             headers:
               Access-Control-Allow-Origin: "'*'"
- 
-
+custom:
+        serverless-offline:
+                httpPort: 4000
 
 

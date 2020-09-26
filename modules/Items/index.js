@@ -350,7 +350,7 @@ const resolvers = {
           merge (b)-[:IS_TYPE]->(d)
           with i,t,r,rs,d,b
           unwind rs.values as campos
-          merge (c:restrictionValue{id:randomUUID(),value:campos.value,price:campos.price})-[:belongs]->(b)
+          merge (c:restrictionValue{id:randomUUID(),value:campos.value})-[:belongs]->(b)
           return i,t,r,b,d
         `,
           {
