@@ -34,6 +34,7 @@ const typeDefs = `
   type RestrictionValue{
     id: String
     value: String
+    price: Float
     restriction: Restriction
   }
 
@@ -78,6 +79,7 @@ const typeDefs = `
     nameRestriction: String
     required: Boolean
     quantity: Int
+    price: Float
     values: [ValueByItemData]
   }
 
